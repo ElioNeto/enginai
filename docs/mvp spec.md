@@ -1,7 +1,7 @@
-# enginai - Complete MVP Technical Specification
+# EnginAI — Complete MVP Specification
 
-**Version:** 3.0 - Complete MVP (Create + Implement)  
-**Date:** January 22, 2026  
+**Version:** 4.0 (Node.js + TypeScript)  
+**Date:** March 17, 2026  
 **Scope:** Create applications from scratch + Implement features in existing apps  
 **Timeline:** 8 weeks  
 **Cost:** $0.00/month
@@ -16,18 +16,17 @@ Developers lose time on:
 2. **Implementing repetitive features** in existing projects (endpoints, CRUD, validations)
 
 ### MVP Solution
-enginai **creates applications from scratch** using templates and **implements simple features** in existing repositories, with a fully automated workflow.
+EnginAI **creates applications from scratch** and **implements simple features** in existing repositories, with a fully automated workflow. Built in **Node.js + TypeScript** for maximum ecosystem compatibility.
 
 ### MVP Scope (What it DOES)
 
 **🆕 CREATE APPLICATIONS FROM SCRATCH:**
-✅ REST API (FastAPI, Flask, Express)  
-✅ Basic Web App (Angular, React - initial structure)  
-✅ Automatic configuration (database, basic authentication)  
-✅ Test structure  
+✅ REST API (FastAPI/Python, Express/TypeScript)  
+✅ Basic Web App (Angular, React — initial structure)  
+✅ Python/TypeScript Scripts (CLI with tests)  
+✅ Automatic README generation via LLM  
 ✅ Docker + docker-compose  
-✅ Basic CI/CD (GitHub Actions)  
-✅ README with documentation  
+✅ Git initialization with initial commit  
 
 **🔧 IMPLEMENT FEATURES IN EXISTING APPS:**
 ✅ Read GitHub Issues  
@@ -36,304 +35,247 @@ enginai **creates applications from scratch** using templates and **implements s
 ✅ Implement CRUD  
 ✅ Create functions/classes  
 ✅ Add validations  
-✅ Fix specific bugs  
-✅ Generate unit tests  
-✅ Commit, push, and PR  
+✅ Generate unit tests (Jest / pytest)  
+✅ Commit, push, and open PR  
 
-### MVP Scope (What it DOES NOT DO - V1)
+### MVP Scope (What it DOES NOT DO — V1)
 ❌ Complex apps (microservices, distributed architectures)  
 ❌ RAG with Vector Store (deep context analysis)  
-❌ Iterative automatic correction (multiple attempts)  
+❌ Iterative automatic correction  
 ❌ Persistent memory between executions  
 ❌ Complex features (10+ files, large refactors)  
 ❌ Graphical interface (V2)  
 
-### MVP Use Cases
-
-**Create from Scratch:**
-1. **Full REST API** with CRUD, authentication, database
-2. **Angular App** with routing, components, services
-3. **Python Script** with CLI, tests, documentation
-4. **Basic Microservice** with Docker
-
-**Implement Features:**
-1. **Add endpoint** to existing API
-2. **Implement CRUD method** in controller
-3. **Create component** in Angular app
-4. **Add validation** to model
-5. **Fix specific bug**
-
 ---
 
-## 1. COMPLETE MVP ARCHITECTURE
+## 1. ARCHITECTURE
 
-### 1.1 Overview
+```mermaid
+flowchart TD
+    CLI["🖥️ CLI\n(Commander + Chalk + Ora)"]
 
-```
-┌─────────────────────────────────────────────────────┐
-│              CLI (Rich Interface)                   │
-└────────────────┬────────────────────────────────┘
-                 │
-         ┌───────▼────────┐
-         │  Orchestrator  │
-         │  (Mode Router) │
-         └───────┬────────┘
-                 │
-    ┌──────────┼──────────┐
-    │ CREATE     │ IMPLEMENT  │
-    ▼            ▼            
-┌────────┐   ┌─────────────────────┐
-│Scaffold│   │ Planner → Coder →   │
-│Service │   │ Tester → Validator  │
-└───┬────┘   └─────────┬───────────┘
-    │                  │
-    └──────────┬───────┘
-               │
-    ┌──────────┼────────────┐
-    │          │             │
-┌───▼───┐  ┌──▼─────┐  ┌───▼─────┐
-│ Repo  │  │Template │  │   LLM    │
-│Manager│  │ Engine  │  │  Router  │
-└───────┘  └─────────┘  └──────────┘
-```
+    CLI --> ORC["⚙️ MainOrchestrator"]
 
-### 1.2 MVP Components
+    ORC -->|create| SCAF["📦 ScaffolderService"]
+    ORC -->|implement| PLAN["🧠 PlannerAgent"]
 
-**1. CLI (Interface)**
-- Commands: `create` (new app) and `implement` (feature)
-- Progress bars, logs, confirmations
+    PLAN --> CODE["💻 CoderAgent"]
+    CODE --> TEST["🧪 TesterAgent"]
 
-**2. Orchestrator (Mode Router)**
-- Detects mode: CREATE vs IMPLEMENT
-- Routes to Scaffolder or Planner
+    SCAF --> REPO
+    TEST --> REPO["🐙 RepoManager\n(simple-git + GitHub API)"]
 
-**3. Scaffolder Service (NEW)**
-- Generates project structure from templates
-- Customizes based on user parameters
-- Initializes Git, creates README, configures CI/CD
-
-**4. Template Engine (NEW)**
-- Template library for each app type
-- Variable substitution (project name, author, etc.)
-- Customizable templates via LLM prompts
-
-**5. Planner Agent**
-- Analyzes demand and existing repo
-- Generates implementation plan (1-5 subtasks)
-
-**6. Coder Agent**
-- Generates code (create app or modify)
-- Applies changes to files
-
-**7. Tester Agent**
-- Generates unit tests
-- Validates implementation
-
-**8. Repo Manager**
-- Git operations (clone, branch, commit, push, PR)
-- New repo initialization
-
-**9. LLM Router**
-- Gemini (primary, free) + Ollama (fallback)
-
----
-
-## 2. DETAILED MODULES
-
-### 2.1 CLI Module
-
-**Commands:**
-
-```bash
-# === CREATE NEW APP ===
-enginai create --type api --name user-service --language python
-enginai create --type webapp --name dashboard --framework angular
-enginai create --type script --name data-processor
-
-# === IMPLEMENT FEATURE ===
-enginai implement --issue <URL>
-enginai implement --text "add GET /users endpoint" --repo <URL>
-
-# === CONFIGURATION ===
-enginai config --check
-enginai config --setup
-
-# === TEMPLATES ===
-enginai templates --list
-enginai templates --show api-fastapi
+    REPO --> LLM["🤖 ModelRouter"]
+    LLM -->|primary| GEM["✨ Gemini\n(@google/generative-ai)"]
+    LLM -->|fallback| OLL["🦙 Ollama\n(axios HTTP)"]
 ```
 
 ---
 
-### 2.2 Scaffolder Service
+## 2. MVP COMPONENTS
 
-**Template Selection:**
-
-```python
-templates = {
-    ('api', 'python', 'fastapi'): 'api-fastapi',
-    ('api', 'python', 'flask'): 'api-flask',
-    ('api', 'typescript', 'express'): 'api-express',
-    ('webapp', 'typescript', 'angular'): 'webapp-angular',
-    ('webapp', 'typescript', 'react'): 'webapp-react',
-    ('script', 'python', None): 'script-python'
-}
-```
+| Module | File | Responsibility |
+|---|---|---|
+| CLI | `src/cli/main.ts` | Commands: `create`, `implement`, `config` |
+| MainOrchestrator | `src/core/orchestrator.ts` | Flow coordinator |
+| ModelRouter | `src/core/modelRouter.ts` | Gemini → Ollama fallback + quota |
+| PlannerAgent | `src/agents/planner.ts` | demand → Plan |
+| CoderAgent | `src/agents/coder.ts` | Plan → FileChange[] |
+| TesterAgent | `src/agents/tester.ts` | FileChange[] → test files |
+| ScaffolderService | `src/services/scaffolder.ts` | Generate project structure |
+| RepoManager | `src/adapters/repoManager.ts` | Git ops + GitHub PR |
+| AppConfig | `src/config/index.ts` | .env loader |
+| Types | `src/types/index.ts` | Shared interfaces |
 
 ---
 
-## 3. AVAILABLE TEMPLATES
+## 3. TECH STACK
 
-### 3.1 REST API (FastAPI - Python)
+| Concern | Package | Why |
+|---|---|---|
+| Runtime | Node.js 20+ | LTS, native async, great ecosystem |
+| Language | TypeScript 5.5+ | Types, safer refactors |
+| CLI | Commander.js | Typed, best-in-class help generation |
+| Terminal | Chalk + Ora | Colors + spinners |
+| LLM (primary) | `@google/generative-ai` | Free Gemini API |
+| LLM (fallback) | `axios` + Ollama HTTP | Local, zero cost |
+| Git | `simple-git` | Best Node.js Git wrapper |
+| Validation | Zod | Runtime + TypeScript type inference |
+| Templating | Nunjucks | Jinja2-compatible, project scaffolding |
+| Tests | Jest + `ts-jest` | Standard TypeScript test runner |
+| Linting | ESLint + prettier | Code quality |
 
-**Features:** Modular structure, optional JWT auth, PostgreSQL/SQLite, full CRUD, Pydantic validation, pytest, Docker, CI/CD, auto OpenAPI docs.
+---
+
+## 4. AVAILABLE TEMPLATES
+
+### `api-fastapi` (Python + FastAPI)
 
 ```
-user-service/
-├── src/ (main, models, routes, schemas, services)
+{{project_name}}/
+├── src/main.py            # FastAPI app + /health + /
 ├── tests/
 ├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-└── .github/workflows/ci.yml
+├── Dockerfile             # python:3.11-slim
+└── README.md              # LLM-generated
 ```
 
-### 3.2 REST API (Express - TypeScript)
+### `api-express` (TypeScript + Express)
 
-**Features:** Modular structure, JWT auth, TypeORM, full CRUD, class-validator, Jest, Docker, ESLint + Prettier.
+```
+{{project_name}}/
+├── src/app.ts             # Express app + /health
+├── tests/
+├── package.json
+├── Dockerfile             # node:20-alpine
+└── README.md              # LLM-generated
+```
 
-### 3.3 Web App (Angular)
+### `webapp-angular`
 
-**Features:** Standard Angular structure, routing, base components, optional auth service, HttpClient, Jasmine tests, production Dockerfile.
+```
+{{project_name}}/
+├── src/
+├── package.json
+└── README.md
+```
 
-### 3.4 Python CLI Script
+### `script-typescript`
 
-**Features:** Click CLI, .env config, structured logging, pytest, setup.py.
+```
+{{project_name}}/
+├── src/index.ts           # ts-node CLI
+└── README.md
+```
 
 ---
 
-## 4. ENVIRONMENT CONFIGURATION
+## 5. ENVIRONMENT
 
 ```bash
-# ENGINAI - CONFIGURATION
+# === REQUIRED ===
+GEMINI_API_KEY=AIzaSy_xxxxx     # https://aistudio.google.com/apikey
+GITHUB_TOKEN=ghp_xxxxx          # https://github.com/settings/tokens (repo + workflow)
+
+# === OPTIONAL (have defaults) ===
 APP_ENV=dev
-LOG_LEVEL=INFO
 WORKDIR=~/.enginai/workspace
-
-GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 DEFAULT_BASE_BRANCH=main
-
-GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+CREATE_DRAFT_PR=true
 GEMINI_DAILY_LIMIT=1450
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_GPU_ENABLED=true
-
-TEMPLATES_DIR=~/.enginai/templates
+OLLAMA_MODEL=qwen2.5-coder:7b
 DEFAULT_AUTHOR=Your Name
 DEFAULT_LICENSE=MIT
 ```
 
 ---
 
-## 5. IMPLEMENTATION PLAN (8 WEEKS)
+## 6. IMPLEMENTATION PLAN (8 WEEKS)
 
-### Sprint 1 (Weeks 1-2): Foundation + Templates
-- [ ] Project setup: structure, poetry, .env
-- [ ] CLI with `create` and `implement` commands
-- [ ] RepoManager: init, clone, branch, commit, push
-- [ ] Template Engine: load and process Jinja2 templates
-- [ ] 3 base templates (api-fastapi, api-express, webapp-angular)
-- [ ] Unit tests: coverage > 60%
+### Sprint 1 (Weeks 1–2): Foundation + Templates
+- [ ] Project setup: `package.json`, `tsconfig.json`, ESLint, Prettier
+- [ ] CLI: `create`, `implement`, `config` commands
+- [ ] `RepoManager`: init, clone, branch, commit, push
+- [ ] Template Engine: Nunjucks loader + variable substitution
+- [ ] 3 base templates: `api-fastapi`, `api-express`, `webapp-angular`
+- [ ] Tests: coverage ≥ 60% — Issue [#1](https://github.com/ElioNeto/enginai/issues/1)
 
-### Sprint 2 (Weeks 3-4): Scaffolder + LLM Integration
-- [ ] LLMRouter: Gemini + Ollama
-- [ ] ScaffolderService: structure generation + LLM customization
-- [ ] Generate README with LLM
-- [ ] Generate auth module with LLM
-- [ ] Generate initial tests with LLM
-- [ ] Unit tests: coverage > 70%
+### Sprint 2 (Weeks 3–4): Scaffolder + LLM Integration
+- [ ] `ModelRouter`: Gemini SDK + Ollama via axios + quota + fallback
+- [ ] `ScaffolderService`: template rendering + LLM-generated files
+- [ ] LLM-generated README, auth module, initial tests
+- [ ] Tests: coverage ≥ 70% — Issue [#7](https://github.com/ElioNeto/enginai/issues/7)
 
-### Sprint 3 (Weeks 5-6): Implement Mode
-- [ ] PlannerAgent: analysis + plan
-- [ ] CoderAgent: code generation
-- [ ] TesterAgent: test generation
-- [ ] ExecutorService: run commands
-- [ ] Unit tests: coverage > 75%
+### Sprint 3 (Weeks 5–6): Implement Mode
+- [ ] `PlannerAgent`: `createPlan(demand, repoPath) → Plan`
+- [ ] `CoderAgent`: `implementPlan(plan, repoPath) → FileChange[]`
+- [ ] `TesterAgent`: `generateTests(changes, repoPath) → string[]`
+- [ ] `ExecutorService`: detect + run linter/typecheck/tests
+- [ ] Tests: coverage ≥ 75% — Issue [#10](https://github.com/ElioNeto/enginai/issues/10)
 
-### Sprint 4 (Weeks 7-8): GitHub Integration + Polish
-- [ ] GitHub Integration: read Issue, create PR
-- [ ] Orchestrator: mode router (CREATE vs IMPLEMENT)
-- [ ] Progress bars and UX (Rich)
-- [ ] Robust error handling
-- [ ] Complete documentation
-- [ ] E2E tests: real scenarios
-- [ ] Unit tests: coverage > 80%
+### Sprint 4 (Weeks 7–8): GitHub Integration + Polish
+- [ ] GitHub Provider: read Issues via API, create PRs
+- [ ] `MainOrchestrator`: wire all modules together
+- [ ] UX: spinners, phase labels, confirmation prompts
+- [ ] Robust error handling + actionable messages
+- [ ] E2E tests: real CREATE + IMPLEMENT scenarios
+- [ ] Tests: coverage ≥ 80% — Issue [#15](https://github.com/ElioNeto/enginai/issues/15)
 
 **Delivery: Week 9 — MVP v1.0.0 🚀**
 
 ---
 
-## 6. COMPLETE USE CASES
+## 7. COMPLETE USE CASES
 
-### Case 1: Create REST API from Scratch
+### Case 1: Create TypeScript API
 
 ```bash
 enginai create \
   --type api \
   --name user-service \
+  --language typescript \
+  --framework express
+```
+
+```
+✅ Project created at: ./user-service
+📁 Project path: /Users/elio/user-service
+```
+
+### Case 2: Create Python API
+
+```bash
+enginai create \
+  --type api \
+  --name analytics-api \
   --language python \
   --framework fastapi \
   --database postgres \
   --auth
 ```
 
-**Result:**
-```
-✅ Project created at: ./user-service
-📝 Next steps:
-   cd user-service
-   docker-compose up
-   # API running at http://localhost:8000
-   # Docs at http://localhost:8000/docs
-```
-
-**Time:** ~2-3 minutes
-
-### Case 2: Implement Feature in Existing API
+### Case 3: Implement Feature from Issue
 
 ```bash
 enginai implement \
+  --repo "https://github.com/user/api" \
   --issue "https://github.com/user/api/issues/42"
 ```
 
-Flow: clone → analyze → plan → implement → tests → validate → commit + PR
+Flow: clone → plan → confirm → implement → tests → commit + PR  
+**Time:** ~3–5 minutes
 
-**Time:** ~3-5 minutes
+### Case 4: Implement from Text
+
+```bash
+enginai implement \
+  --repo "https://github.com/user/api" \
+  --text "add GET /health endpoint returning 200 with { status: 'ok' }"
+```
 
 ---
 
-## 7. MVP LIMITATIONS
-
-### What it does NOT do (coming in V1)
+## 8. MVP LIMITATIONS
 
 ❌ Complex apps (distributed microservices)  
-❌ RAG / deep analysis (10+ files)  
-❌ Iterative auto-correction  
-❌ Persistent memory  
-❌ Advanced features (multi-repo, monorepos)  
+❌ RAG / deep analysis (10+ files) — coming in V1  
+❌ Iterative auto-correction — coming in V1  
+❌ Persistent memory — coming in V1  
+❌ Advanced features (multi-repo, monorepos) — V2  
 
 ---
 
-## 8. ACCEPTANCE CRITERIA
+## 9. ACCEPTANCE CRITERIA
 
 ### CREATE
-✅ Given a create command, generates a functional app  
-✅ Complete template structure + LLM-customized files  
-✅ Tests passing + README + Git initialized  
+✅ Given a `create` command, generates a valid project structure  
+✅ README generated by LLM reflects actual project config  
+✅ Git repo initialized with initial commit  
 
 ### IMPLEMENT
-✅ Given an Issue, implements simple feature  
-✅ Clone, analyze, plan, code (1-3 files), tests, validate, PR created  
+✅ Given an Issue or text, implements simple feature in 1–3 files  
+✅ Clone → plan → code → tests → validate → PR created  
 
 ### Success Metrics
 - CREATE success rate: > 95%
@@ -341,30 +283,29 @@ Flow: clone → analyze → plan → implement → tests → validate → commit
 - Average CREATE time: < 3 minutes
 - Average IMPLEMENT time: < 5 minutes
 - Cost: $0.00
-- Test coverage: > 80%
+- Test coverage: ≥ 80%
 
 ---
 
-## 9. POST-MVP ROADMAP
+## 10. POST-MVP ROADMAP
 
-### V1 (Weeks 9-14): Complex Features + RAG
-- ✅ RAG with FAISS (rich context)
+### V1 (Weeks 9–14): Complex Features + RAG
 - ✅ Auto-correction (3 attempts)
-- ✅ Persistent memory (SQLite)
+- ✅ RAG with vector store (FAISS or Gemini Embeddings)
+- ✅ Persistent memory (`better-sqlite3`)
 - ✅ Pattern Learner
 - ✅ More templates (React, Vue, Django)
-- ✅ Complex features (5-10 files)
+- ✅ Complex features (5–10 files)
 
-### V2 (Weeks 15-18): GUI + Advanced
-- ✅ Graphical interface (Electron + Angular)
+### V2 (Weeks 15–18): GUI + Advanced
+- ✅ GUI: Electron + Angular
 - ✅ Multi-repo support
-- ✅ IDE integrations
+- ✅ IDE integrations (VSCode extension)
 - ✅ Customizable templates + marketplace
 
 ---
 
-**Document generated on:** January 22, 2026  
-**Version:** 3.0 (Complete MVP - CREATE + IMPLEMENT)  
-**Status:** Ready for implementation  
-**Estimated delivery:** 8 weeks  
+**Document updated:** March 17, 2026  
+**Runtime:** Node.js 20+ + TypeScript 5.5+  
+**Status:** Active development — Sprint 3–4  
 **Monthly cost:** $0.00

@@ -1,7 +1,7 @@
 # EnginAI — Technical Specification & Implementation Plan
 
-**Version:** 1.0  
-**Date:** January 22, 2026  
+**Version:** 2.0 (Node.js + TypeScript)  
+**Date:** March 17, 2026  
 **Author:** Technical specification for EnginAI
 
 ---
@@ -10,7 +10,7 @@
 
 Build an application that receives a demand (free text or an Issue), understands and breaks it into subtasks, implements code changes with unit tests, runs validations, commits/pushes, and opens a PR. The system should maintain project memory and learn from past failures, continuously explaining what it is doing and asking for confirmation when necessary.
 
-**Target audience:** Developers working with Python, Angular/TypeScript, automations, and processing scripts (e.g., ffmpeg).
+**Target audience:** Developers working with TypeScript/JavaScript, Python, Angular, and automation scripts.
 
 ---
 
@@ -18,629 +18,310 @@ Build an application that receives a demand (free text or an Issue), understands
 
 ### 1.1 Architecture Overview
 
-The system adopts a **hierarchical agent architecture with feedback loop and shared RAG**, where a central orchestrator coordinates specialized agents that collaborate in iterative cycles until acceptance criteria are met.
+The system adopts a **hierarchical agent architecture with feedback loop**, where a central orchestrator coordinates specialized agents that collaborate in iterative cycles until acceptance criteria are met.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     ORCHESTRATOR                            │
-│                  (Central Coordinator)                      │
-└────────────┬────────────────────────────────────────────────┘
-             │
-    ┌────────┴────────┐
-    │                 │
-┌───▼────┐      ┌────▼─────┐      ┌──────────┐
-│Planner │      │  Coder   │      │ Reviewer │
-│ Agent  │◄────►│  Agent   │◄────►│  Agent   │
-└───┬────┘      └────┬─────┘      └──────┬───┘
-    │                │                   │
-    │         ┌──────▼──────┐            │
-    └────────►│   Executor  │◄───────────┘
-              │   Service   │
-              └──────┬──────┘
-                     │
-    ┌────────────────┼────────────────┐
-    │                │                │
-┌───▼────┐    ┌─────▼─────┐    ┌────▼─────┐
-│ Vector │    │   Repo    │    │ Project  │
-│ Store  │    │  Manager  │    │  Memory  │
-└────────┘    └───────────┘    └──────────┘
+```mermaid
+flowchart TD
+    CLI["CLI\n(Commander + Chalk + Ora)"]
+    ORC["MainOrchestrator"]
+    PLAN["PlannerAgent"]
+    CODER["CoderAgent"]
+    TEST["TesterAgent"]
+    REPO["RepoManager\n(simple-git)"]
+    ROUTER["ModelRouter\n(Gemini | Ollama)"]
+    SCAFF["ScaffolderService"]
+
+    CLI --> ORC
+    ORC -->|create| SCAFF
+    ORC -->|implement| PLAN
+    PLAN --> CODER
+    CODER --> TEST
+    SCAFF --> REPO
+    TEST --> REPO
+    PLAN & CODER & TEST & SCAFF --> ROUTER
 ```
 
 ### 1.2 Architectural Layers
 
-**Layer 1: Interface (UI Layer)**
-- CLI: Rich-based terminal UI with progress bars, tables, and interactive prompts
-- GUI: Electron/Tauri with Angular frontend
-- Local REST API (optional): for IDE integration
+**Layer 1: Interface**
+- CLI: Commander.js with Chalk (colors) and Ora (spinners)
+- GUI: Electron + Angular (V2)
 
-**Layer 2: Orchestration (Domain Layer)**
-- MainOrchestrator: end-to-end flow (ingestion → planning → execution → PR)
-- TaskCoordinator: manages subtask queues and dependencies
-- FeedbackLoop: implements automatic correction cycles
+**Layer 2: Orchestration**
+- `MainOrchestrator`: end-to-end flow coordinator (create & implement)
 
-**Layer 3: Agents (Domain Services)**
-- PlannerAgent: decomposes demand into a structured plan
-- CoderAgent: code generation and modifications
-- ReviewerAgent: quality analysis and suggestions
-- TestAgent: test creation and execution
+**Layer 3: Agents**
+- `PlannerAgent`: decomposes demand into a structured `Plan`
+- `CoderAgent`: generates and modifies code files (`FileChange[]`)
+- `TesterAgent`: generates Jest/pytest unit tests
 
-**Layer 4: Services (Application Services)**
-- IndexerService: chunking, embeddings, vector indexing
-- ExecutorService: command execution (lint/test/build)
-- RepoManager: Git operations (clone, branch, commit, push, PR)
-- MemoryService: context persistence and learning
+**Layer 4: Services**
+- `ScaffolderService`: project structure generation from templates
+- `ExecutorService` (V1): lint, typecheck, test runner
 
-**Layer 5: Adapters (Infrastructure)**
-- GitProviders: GitHub, GitLab, Bitbucket
-- LLMProviders: OpenAI, Anthropic, Ollama, etc.
-- VectorStores: FAISS, ChromaDB, LanceDB
-- EmbeddingProviders: OpenAI, HuggingFace, local
+**Layer 5: Adapters**
+- `RepoManager`: Git operations via `simple-git` + GitHub REST API via `axios`
+- `ModelRouter`: routes prompts to Gemini or Ollama
 
-**Layer 6: Data (Persistence)**
-- SQLite: metadata, memory, history
-- File System: workspace, cache, indexes
-- Remote: Git repos, object storage (optional)
+**Layer 6: Data**
+- File system: workspace, generated projects, quota tracking
+- SQLite (V1): execution memory and learned patterns
 
 ---
 
 ## 2. CORE MODULES
 
-### 2.1 Orchestrator Module
+### 2.1 Orchestrator (`src/core/orchestrator.ts`)
 
-**Responsibility:** Coordinate the complete end-to-end flow.
+**Responsibility:** Coordinate the complete CREATE and IMPLEMENT flows.
 
-**Components:**
-- `MainOrchestrator`: entry point, manages phases (ingest → plan → execute → finalize)
-- `PhaseManager`: state machine for phase transitions
-- `CheckpointManager`: save/restore state between phases
-- `ConfirmationHandler`: request user approvals
+```typescript
+class MainOrchestrator {
+  async createProject(
+    projectType: string,
+    name: string,
+    language: string,
+    framework?: string,
+    database?: string,
+    includeAuth?: boolean,
+  ): Promise<CreateResult>
 
-**Interface:**
-```python
-class MainOrchestrator:
-    async def execute_task(
-        self,
-        input: TaskInput,  # text or Issue
-        mode: ExecutionMode,  # plan_only | execute | auto
-        checkpoint_file: Optional[Path] = None
-    ) -> ExecutionResult
-```
-
-**Data Models:**
-```python
-@dataclass
-class TaskInput:
-    type: Literal["text", "issue"]
-    content: str
-    repository_url: Optional[str]
-    issue_number: Optional[int]
-    attachments: List[Attachment]
-
-@dataclass
-class ExecutionResult:
-    status: Literal["completed", "partial", "failed"]
-    plan: Plan
-    changes: List[FileChange]
-    tests_results: TestResults
-    pr_url: Optional[str]
-    checkpoints: List[Checkpoint]
+  async implementFeature(
+    repoUrl: string,
+    issueUrl?: string,
+    text?: string,
+  ): Promise<ImplementResult>
+}
 ```
 
 ---
 
-### 2.2 Planner Module
+### 2.2 Planner Agent (`src/agents/planner.ts`)
 
-**Responsibility:** Transform a demand into an executable plan with subtasks.
+**Responsibility:** Transform a demand into an executable `Plan` with subtasks.
 
-**Components:**
-- `DemandAnalyzer`: extract requirements and identify ambiguities
-- `TaskDecomposer`: break into subtasks with dependencies (DAG)
-- `AcceptanceCriteriaGenerator`: define validations per subtask
-- `QuestionGenerator`: formulate clarification questions
+```typescript
+class PlannerAgent {
+  async createPlan(demand: string, repoPath: string): Promise<Plan>
+}
 
-**Interface:**
-```python
-class PlannerAgent:
-    async def create_plan(
-        self,
-        demand: str,
-        repo_context: RepoContext,
-        memory: ProjectMemory
-    ) -> Plan
+interface Plan {
+  title: string
+  description: string
+  subtasks: SubTask[]
+}
 
-    async def generate_questions(
-        self,
-        demand: str,
-        repo_context: RepoContext
-    ) -> List[Question]
-```
-
-**Data Models:**
-```python
-@dataclass
-class Plan:
-    id: str
-    title: str
-    description: str
-    subtasks: List[SubTask]
-    dependencies: Dict[str, List[str]]  # DAG
-    estimated_duration: timedelta
-
-@dataclass
-class SubTask:
-    id: str
-    title: str
-    description: str
-    files_to_modify: List[str]
-    test_strategy: str
-    acceptance_criteria: List[str]
-    validation_commands: List[str]
-    risks: List[str]
+interface SubTask {
+  id: string
+  title: string
+  description: string
+  filesToModify: string[]
+  acceptanceCriteria: string[]
+}
 ```
 
 ---
 
-### 2.3 Indexer & Vector Store Module
+### 2.3 Coder Agent (`src/agents/coder.ts`)
 
-**Responsibility:** Process the full repo, create embeddings, and enable semantic search.
+**Responsibility:** Implement subtasks as concrete file changes.
 
-**Components:**
-- `RepoScanner`: read file tree, detect languages/frameworks
-- `Chunker`: split files into semantic chunks
-- `EmbeddingGenerator`: generate embeddings (batch)
-- `VectorStoreManager`: CRUD on the vector index
-- `SemanticRetriever`: search for relevant context
+```typescript
+class CoderAgent {
+  async implementPlan(plan: Plan, repoPath: string): Promise<FileChange[]>
+}
 
-**Interface:**
-```python
-class IndexerService:
-    async def index_repository(
-        self,
-        repo_path: Path,
-        force_reindex: bool = False
-    ) -> IndexStats
-
-    async def search_similar(
-        self,
-        query: str,
-        k: int = 5,
-        filters: Optional[Dict] = None
-    ) -> List[SearchResult]
-```
-
-**Chunking Strategy:**
-- Base size: 512 tokens (adjustable per language)
-- Overlap: 50 tokens
-- Respect structure: complete classes/functions when possible
-- Filters: ignore `node_modules/`, `dist/`, `.venv/`, `build/`, `*.min.js`, etc.
-
-**Per-chunk Metadata:**
-```python
-@dataclass
-class ChunkMetadata:
-    file_path: str
-    chunk_index: int
-    start_line: int
-    end_line: int
-    language: str
-    file_type: str  # source | test | config
-    symbols: List[str]  # detected functions/classes
-    timestamp: datetime
-```
-
-**Supported Vector Stores:**
-- **FAISS** (default): local, fast, zero cost
-- **ChromaDB**: local, simple API, great for development
-- **LanceDB + S3**: production, scalable
-- **PostgreSQL + pgvector**: if already using Postgres
-
----
-
-### 2.4 Repo Manager Module
-
-**Responsibility:** Git operations and PR creation.
-
-**Components:**
-- `GitClient`: wrapper over GitPython/pygit2
-- `BranchManager`: create/delete branches
-- `CommitBuilder`: consistent messages (Conventional Commits optional)
-- `PRCreator`: open PR via provider API
-- `ConflictResolver`: detect conflicts and guide resolution
-
-**Interface:**
-```python
-class RepoManager:
-    async def setup_workspace(
-        self,
-        repo_url: str,
-        base_branch: str
-    ) -> Path
-
-    async def create_feature_branch(
-        self,
-        branch_name: str
-    ) -> str
-
-    async def apply_changes(
-        self,
-        changes: List[FileChange]
-    ) -> None
-
-    async def commit_and_push(
-        self,
-        message: str,
-        co_authors: Optional[List[str]] = None
-    ) -> str  # commit SHA
-
-    async def create_pull_request(
-        self,
-        title: str,
-        body: str,
-        base: str,
-        draft: bool
-    ) -> PullRequest
-```
-
-**Data Models:**
-```python
-@dataclass
-class FileChange:
-    operation: Literal["create", "update", "delete"]
-    path: str
-    content: Optional[str]
-    original_sha: Optional[str]  # for updates
-
-@dataclass
-class PullRequest:
-    number: int
-    url: str
-    title: str
-    body: str
-    draft: bool
-```
-
----
-
-### 2.5 Executor Module
-
-**Responsibility:** Run external tools (lint, test, typecheck) and capture results.
-
-**Components:**
-- `CommandRunner`: execute commands with timeout and capture
-- `ToolDetector`: identify tools available in the project
-- `OutputParser`: interpret stdout/stderr from known tools
-- `ErrorDiagnoser`: analyze errors and suggest fixes
-
-**Interface:**
-```python
-class ExecutorService:
-    async def detect_tools(
-        self,
-        repo_path: Path
-    ) -> DetectedTools
-
-    async def run_linter(
-        self,
-        files: Optional[List[str]] = None
-    ) -> LintResult
-
-    async def run_type_checker(
-        self
-    ) -> TypeCheckResult
-
-    async def run_tests(
-        self,
-        pattern: Optional[str] = None,
-        coverage: bool = False
-    ) -> TestResult
-```
-
-**Auto-detected Tools:**
-
-| Language | Linter | Formatter | Typecheck | Test Runner |
-|---|---|---|---|---|
-| Python | ruff/flake8/pylint | black/ruff | mypy/pyright | pytest/unittest |
-| TypeScript | eslint | prettier | tsc | jest/vitest |
-| JavaScript | eslint | prettier | — | jest/mocha |
-| Go | golangci-lint | gofmt | go build | go test |
-| Rust | clippy | rustfmt | cargo check | cargo test |
-
----
-
-### 2.6 Coder Agent Module
-
-**Responsibility:** Generate/modify code based on subtasks.
-
-**Components:**
-- `CodeGenerator`: create new files
-- `CodeModifier`: apply edits (using AST when possible)
-- `DiffGenerator`: produce readable diffs
-- `ContextRetriever`: search similar examples in the repo via vector store
-
-**Interface:**
-```python
-class CoderAgent:
-    async def implement_subtask(
-        self,
-        subtask: SubTask,
-        repo_context: RepoContext,
-        relevant_chunks: List[SearchResult]
-    ) -> List[FileChange]
-
-    async def fix_error(
-        self,
-        error: ExecutionError,
-        current_code: str,
-        context: str
-    ) -> FileChange
+interface FileChange {
+  path: string
+  content: string
+  operation: 'create' | 'update' | 'delete'
+}
 ```
 
 **Generation Flow:**
-1. Retrieve relevant context (vector search)
-2. Generate changes with LLM
-3. Validate basic syntax
-4. Return FileChanges
+1. Read existing file content (if any)
+2. Build prompt with file context + subtask description + acceptance criteria
+3. Call `ModelRouter.complete()` with `task_type: 'coding'`
+4. Extract code from markdown block in response
+5. Write file to disk and add to `FileChange[]`
 
 ---
 
-### 2.7 Test Agent Module
+### 2.4 Tester Agent (`src/agents/tester.ts`)
 
-**Responsibility:** Create/update unit tests.
+**Responsibility:** Generate unit test files for every `FileChange`.
 
-**Components:**
-- `TestScaffolder`: create test structure for new files
-- `TestGenerator`: generate test cases based on code
-- `TestUpdater`: update existing tests
-- `CoverageAnalyzer`: analyze coverage and identify gaps
-
-**Interface:**
-```python
-class TestAgent:
-    async def generate_tests(
-        self,
-        code_changes: List[FileChange],
-        test_framework: str
-    ) -> List[FileChange]  # test files
-
-    async def analyze_coverage(
-        self,
-        coverage_file: Path
-    ) -> CoverageReport
+```typescript
+class TesterAgent {
+  async generateTests(changes: FileChange[], repoPath: string): Promise<string[]>
+}
 ```
 
-**Red/Green Pattern:**
-- Always try to run tests before changing code (when applicable)
-- Confirm that new tests fail before the fix
-- Validate that they pass after the fix
+- Detects language from file extension (`.ts` → Jest, `.py` → pytest)
+- Generates `<name>.test.ts` or `test_<name>.py` in `tests/`
+- Requires: happy path + at least 1 edge case per function
 
 ---
 
-### 2.8 Memory & Context Module
+### 2.5 Model Router (`src/core/modelRouter.ts`)
 
-**Responsibility:** Maintain history, learning, and project context.
+**Responsibility:** Route LLM calls to Gemini (primary) or Ollama (fallback).
 
-**Components:**
-- `MemoryStore`: SQLite persistence
-- `DecisionLogger`: record technical decisions
-- `ErrorTracker`: track recurring errors
-- `PatternLearner`: extract patterns from the repo (naming, structure, etc.)
+```typescript
+class ModelRouter {
+  async complete(
+    prompt: string,
+    taskType: TaskType,
+    maxTokens?: number,
+    temperature?: number,
+  ): Promise<LLMResponse>
+}
 
-**Interface:**
-```python
-class MemoryService:
-    async def store_execution(
-        self,
-        execution: ExecutionResult
-    ) -> None
+type TaskType = 'planning' | 'coding' | 'testing' | 'review'
 
-    async def get_project_patterns(
-        self,
-        repo_url: str
-    ) -> ProjectPatterns
-
-    async def record_error_resolution(
-        self,
-        error: ExecutionError,
-        resolution: str
-    ) -> None
-
-    async def query_similar_errors(
-        self,
-        error: ExecutionError
-    ) -> List[ErrorResolution]
-```
-
-**SQLite Schema:**
-```sql
--- Executions
-CREATE TABLE executions (
-    id TEXT PRIMARY KEY,
-    repo_url TEXT,
-    branch TEXT,
-    demand TEXT,
-    status TEXT,
-    created_at TIMESTAMP,
-    completed_at TIMESTAMP
-);
-
--- Decisions
-CREATE TABLE decisions (
-    id TEXT PRIMARY KEY,
-    execution_id TEXT,
-    subtask_id TEXT,
-    decision TEXT,
-    rationale TEXT,
-    alternatives TEXT,
-    FOREIGN KEY (execution_id) REFERENCES executions(id)
-);
-
--- Errors and Resolutions
-CREATE TABLE error_resolutions (
-    id TEXT PRIMARY KEY,
-    execution_id TEXT,
-    error_type TEXT,
-    error_message TEXT,
-    file_path TEXT,
-    resolution_strategy TEXT,
-    success BOOLEAN,
-    created_at TIMESTAMP,
-    FOREIGN KEY (execution_id) REFERENCES executions(id)
-);
-
--- Project Patterns
-CREATE TABLE project_patterns (
-    id TEXT PRIMARY KEY,
-    repo_url TEXT,
-    pattern_type TEXT,  -- naming | structure | testing | etc
-    pattern_data JSON,
-    confidence FLOAT,
-    updated_at TIMESTAMP
-);
-```
-
----
-
-### 2.9 Model Router Module
-
-**Responsibility:** Route requests to different LLMs based on the task.
-
-**Components:**
-- `ModelRegistry`: register available providers and models
-- `TaskClassifier`: classify task type
-- `RoutingStrategy`: decide which model to use
-- `FallbackHandler`: switch provider on failure
-
-**Interface:**
-```python
-class ModelRouter:
-    async def complete(
-        self,
-        prompt: str,
-        task_type: TaskType,
-        max_tokens: int,
-        temperature: float = 0.7
-    ) -> CompletionResult
-
-    def register_provider(
-        self,
-        provider: LLMProvider
-    ) -> None
+interface LLMResponse {
+  response: string
+  model: string
+  provider: 'gemini' | 'ollama'
+  tokens?: number
+}
 ```
 
 **Routing Strategy:**
 
-| Task | Ideal Model | Characteristics |
+| Task | Gemini Model | Ollama Fallback |
 |---|---|---|
-| Planning | GPT-4 / Claude-3.5 | Complex reasoning |
-| Code generation | GPT-4 / Claude-3.5 / Codestral | Precision, long context |
-| Error fixing | GPT-4 / Claude-3.5 | Debugging, analysis |
-| Log summarization | GPT-3.5 / Llama 3 70B | Cost-effectiveness |
-| Test generation | GPT-4 / Claude-3.5 | Coverage, edge cases |
-| Code review | GPT-4 / Claude-3.5 | Critical analysis |
+| planning | gemini-1.5-pro | deepseek-r1:7b |
+| coding | gemini-1.5-pro | qwen2.5-coder:7b |
+| testing | gemini-1.5-flash | qwen2.5-coder:7b |
+| review | gemini-1.5-flash | qwen2.5-coder:7b |
 
-**Fallback:**
-- If primary provider fails → try secondary
-- Maintain essential context (do not resend full history)
-- Log failures for analysis
+- Daily quota tracked in `~/.enginai/quota.json`
+- Automatic reset at midnight
+- Exponential backoff on transient errors
 
 ---
 
-## 3. EXTERNAL INTERFACES
+### 2.6 Scaffolder Service (`src/services/scaffolder.ts`)
 
-### 3.1 Git Providers
+**Responsibility:** Generate complete project structures with LLM-customized files.
 
-**GitProvider Interface:**
-```python
-class GitProvider(ABC):
-    @abstractmethod
-    async def get_issue(self, repo: str, number: int) -> Issue
+```typescript
+class ScaffolderService {
+  async generateStructure(opts: ScaffoldOptions): Promise<string>
+}
 
-    @abstractmethod
-    async def create_pull_request(
-        self,
-        repo: str,
-        title: str,
-        body: str,
-        head: str,
-        base: str,
-        draft: bool
-    ) -> PullRequest
-
-    @abstractmethod
-    async def link_pr_to_issue(
-        self,
-        repo: str,
-        pr_number: int,
-        issue_number: int
-    ) -> None
+interface ScaffoldOptions {
+  projectType: string  // api | webapp | script
+  name: string
+  language: string     // python | typescript
+  framework?: string   // fastapi | express | angular | react
+  database?: string    // postgres | mysql | sqlite
+  includeAuth?: boolean
+}
 ```
 
-**Implementations:**
-- `GitHubProvider`: via PyGithub or httpx directly
-- `GitLabProvider`: via python-gitlab
-- `BitbucketProvider`: via requests
+**Supported templates:**
+
+| Type | Language | Framework | Output |
+|---|---|---|---|
+| api | python | fastapi | FastAPI + pytest + Docker |
+| api | typescript | express | Express + Jest + Docker |
+| webapp | typescript | angular | Angular CLI structure |
+| script | typescript | — | ts-node CLI script |
 
 ---
 
-### 3.2 LLM Providers
+### 2.7 Repo Manager (`src/adapters/repoManager.ts`)
 
-**LLMProvider Interface:**
-```python
-class LLMProvider(ABC):
-    @abstractmethod
-    async def complete(
-        self,
-        messages: List[Message],
-        model: str,
-        max_tokens: int,
-        temperature: float,
-        tools: Optional[List[Tool]] = None
-    ) -> CompletionResponse
+**Responsibility:** Git operations and PR creation via GitHub API.
+
+```typescript
+class RepoManager {
+  async cloneRepo(url: string, branch?: string): Promise<string>
+  async initRepo(path: string): Promise<void>
+  async createBranch(path: string, name: string): Promise<void>
+  async commit(path: string, message: string): Promise<void>
+  async createPullRequest(opts: PullRequestOptions): Promise<string | null>
+}
 ```
 
-**Implementations:**
-- `OpenAIProvider`: via openai SDK
-- `AnthropicProvider`: via anthropic SDK
-- `OllamaProvider`: via httpx
-- `AzureOpenAIProvider`: via openai SDK with custom endpoint
+- Uses `simple-git` for all local Git operations
+- Uses `axios` + GitHub REST API for PR creation
+- Branch naming: `feature/<plan-title-slugified>`
 
 ---
 
-### 3.3 Vector Stores
+### 2.8 CLI (`src/cli/main.ts`)
 
-**VectorStore Interface:**
-```python
-class VectorStore(ABC):
-    @abstractmethod
-    async def add_documents(
-        self,
-        documents: List[Document],
-        embeddings: List[List[float]],
-        metadatas: List[Dict]
-    ) -> List[str]  # IDs
+**Commands:**
 
-    @abstractmethod
-    async def search(
-        self,
-        query_embedding: List[float],
-        k: int,
-        filters: Optional[Dict] = None
-    ) -> List[SearchResult]
-
-    @abstractmethod
-    async def delete(self, ids: List[str]) -> None
+```bash
+enginai create -t <type> -n <name> [-l <lang>] [-f <framework>] [-d <db>] [--auth]
+enginai implement -r <repo-url> [-i <issue-url> | -x <text>]
+enginai config [--check]
 ```
 
-**Implementations:**
-- `FAISSStore`: local, .index file
-- `ChromaStore`: ChromaDB client
-- `LanceDBStore`: LanceDB + optional S3
+- Built with **Commander.js**
+- Colors via **Chalk**
+- Progress spinners via **Ora**
+- All commands are fully `async`
 
 ---
 
-## 4. CONFIGURATION & SECURITY
+## 3. SHARED TYPES (`src/types/index.ts`)
 
-### 4.1 .env File (Template)
+```typescript
+export type TaskType = 'planning' | 'coding' | 'testing' | 'review'
+export type FileOperation = 'create' | 'update' | 'delete'
+
+export interface LLMResponse {
+  response: string
+  model: string
+  provider: 'gemini' | 'ollama'
+  tokens?: number
+}
+
+export interface FileChange {
+  path: string
+  content: string
+  operation: FileOperation
+}
+
+export interface SubTask {
+  id: string
+  title: string
+  description: string
+  filesToModify: string[]
+  acceptanceCriteria: string[]
+}
+
+export interface Plan {
+  title: string
+  description: string
+  subtasks: SubTask[]
+}
+
+export interface AppConfig {
+  appEnv: string
+  workdir: string
+  githubToken: string
+  defaultBaseBranch: string
+  createDraftPr: boolean
+  geminiApiKey: string
+  geminiDailyLimit: number
+  ollamaHost: string
+  ollamaModel: string
+  defaultAuthor: string
+  defaultLicense: string
+}
+```
+
+---
+
+## 4. CONFIGURATION & ENVIRONMENT
+
+### .env Template
 
 ```bash
 # Environment
@@ -649,63 +330,29 @@ LOG_LEVEL=INFO
 WORKDIR=~/.enginai/workspace
 
 # Git
-GIT_PROVIDER=github
 GITHUB_TOKEN=ghp_xxxxx
-GITHUB_BASE_URL=https://api.github.com
 DEFAULT_BASE_BRANCH=main
 CREATE_DRAFT_PR=true
 
-# Embeddings
-EMBEDDING_PROVIDER=openai
-EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_BATCH_SIZE=100
-
-# Vector Store
-VECTOR_STORE=faiss
-VECTOR_DB_PATH=~/.enginai/vectordb
-MAX_FILES_INDEX=10000
-IGNORE_GLOBS=node_modules/**,dist/**,.venv/**,build/**,*.min.js
-
-# LLM Routing
-LLM_PROVIDER_PRIMARY=openai
-LLM_PROVIDER_SECONDARY=ollama
-LLM_MODEL_PLANNER=gpt-4-turbo
-LLM_MODEL_CODER=gpt-4-turbo
-LLM_MODEL_REVIEWER=gpt-4-turbo
-LLM_MODEL_SUMMARIZER=gpt-3.5-turbo
-OPENAI_API_KEY=sk-xxxxx
+# Gemini (primary, free)
+GEMINI_API_KEY=AIzaSy_xxxxx
+GEMINI_DAILY_LIMIT=1450
 
 # Ollama (local fallback)
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=codellama:34b
+OLLAMA_MODEL=qwen2.5-coder:7b
 
-# Executor
-TEST_COMMAND_OVERRIDE=
-LINT_COMMAND_OVERRIDE=
-MAX_EXECUTION_TIME=300
-
-# Memory
-MEMORY_DB_PATH=~/.enginai/memory.db
-ENABLE_LEARNING=true
+# Templates
+TEMPLATES_DIR=~/.enginai/templates
+DEFAULT_AUTHOR=Your Name
+DEFAULT_LICENSE=MIT
 ```
 
-### 4.2 Security
+### Security
 
-**Secret Redaction:**
-- Regex to detect: `(token|key|password|secret)[=:]\s*[^\s]+`
-- Replace with `***REDACTED***` in logs and PRs
-- Never persist env vars in database
-
-**Mandatory Confirmations:**
-- Delete files
-- Force push
-- Modify more than 50 files
-- Execute commands with sudo/admin
-
-**Sandboxing:**
-- Run commands in isolated subprocesses
-- Default timeout: 5 minutes
-- Limit memory usage (via cgroups on Linux, optional)
+- Secrets are never logged or committed
+- Destructive operations (delete file, force push) require user confirmation
+- GitHub token scopes required: `repo`, `workflow`
 
 ---
 
@@ -715,436 +362,171 @@ ENABLE_LEARNING=true
 
 ```mermaid
 flowchart TD
-    A["📥 1. INGESTION\ntext or Issue URL"] --> B["❓ 2. QUESTIONS\nClarify ambiguities"]
-    B --> C["📋 3. PLANNING\nBreak into subtasks"]
-    C <--> VS[("🗄️ Vector Store")]
-    C --> D["🔍 4. INDEXING\nScan & embed repo"]
-    D --> E["💻 5. IMPLEMENT\nGenerate code changes"]
-    E --> F["🧪 6. TEST\nRun unit tests"]
-    F --> G["✅ 7. VALIDATE\nlint + typecheck"]
-    G --> H{{"Pass?"}}
-    H -->|NO| E
-    H -->|YES| I["📦 8. FINALIZE\nCommit + Push + PR"]
+    A["📥 1. INPUT\ntext or Issue URL"] --> B["📋 2. PLAN\nPlannerAgent breaks into subtasks"]
+    B --> C["💻 3. IMPLEMENT\nCoderAgent generates file changes"]
+    C --> D["🧪 4. TEST\nTesterAgent generates unit tests"]
+    D --> E["📦 5. FINALIZE\ncommit + branch + push + PR"]
 ```
 
-### 5.2 Auto-Correction Loop
+### 5.2 Auto-Correction Loop (V1)
 
 ```mermaid
 flowchart TD
     A["▶️ Run Tests"] --> B{{Pass?}}
     B -->|YES| Z["✅ Continue"]
     B -->|NO| C["🔍 Parse Errors"]
-    C --> D["🗃️ Search Similar Errors\n(Memory DB)"]
-    D --> E["🤖 Generate Fix\n(LLM - Coder)"]
-    E --> F["📝 Apply Fix"]
-    F --> G{{"Iterations < 3?"}}
-    G -->|YES| A
-    G -->|NO| H["🙋 Ask User"]
+    C --> D["🤖 Generate Fix\n(ModelRouter)"]
+    D --> E["📝 Apply Fix\n(CoderAgent)"]
+    E --> F{{"Iterations < 3?"}}
+    F -->|YES| A
+    F -->|NO| H["🙋 Ask User"]
 ```
 
 ---
 
-## 6. CORE DATA MODELS
+## 6. TECH STACK
 
-```python
-@dataclass
-class RepoContext:
-    """Complete repository context"""
-    url: str
-    local_path: Path
-    base_branch: str
-    languages: List[str]
-    frameworks: List[str]
-    test_framework: Optional[str]
-    lint_tools: List[str]
-    dependencies: Dict[str, List[str]]  # package manager → packages
-    folder_structure: Dict[str, Any]
-    patterns: ProjectPatterns
+### Core
 
-@dataclass
-class ProjectPatterns:
-    """Detected patterns in the project"""
-    naming_convention: str  # snake_case | camelCase | PascalCase
-    test_file_pattern: str  # test_*.py | *.test.ts
-    folder_structure_type: str  # flat | nested | feature-based
-    import_style: str
-    code_style: Dict[str, Any]
+| Concern | Package | Version |
+|---|---|---|
+| Runtime | Node.js | 20+ |
+| Language | TypeScript | 5.5+ |
+| CLI framework | Commander.js | 12.x |
+| Terminal output | Chalk + Ora | 5.x / 8.x |
+| Schema validation | Zod | 3.x |
 
-@dataclass
-class Checkpoint:
-    """Saved state for recovery"""
-    phase: str
-    timestamp: datetime
-    data: Dict[str, Any]
-    success: bool
+### LLM Integration
 
-@dataclass
-class ExecutionError:
-    """Error captured during execution"""
-    type: str  # lint | typecheck | test | build
-    message: str
-    file: Optional[str]
-    line: Optional[int]
-    stack_trace: Optional[str]
-    severity: Literal["error", "warning"]
-```
+| Provider | Package |
+|---|---|
+| Gemini | `@google/generative-ai` |
+| Ollama | `axios` (HTTP direct) |
+
+### Git
+
+| Concern | Package |
+|---|---|
+| Local Git ops | `simple-git` |
+| GitHub API (PRs) | `axios` |
+
+### Testing
+
+| Concern | Package |
+|---|---|
+| Test runner | Jest + `ts-jest` |
+| Type checking | TypeScript strict mode |
+| Linting | ESLint + `@typescript-eslint` |
+| Formatting | Prettier |
+
+### Templating
+
+| Concern | Package |
+|---|---|
+| Template engine | Nunjucks |
 
 ---
 
 ## 7. IMPLEMENTATION PLAN
 
-### MVP (Minimum Viable Product) — 4–6 weeks
+### MVP — Sprint 1–4 (8 weeks)
 
-**Goal:** Functional system for simple demands, no GUI, basic validation.
+#### Sprint 1 — Foundation (#1)
+- [ ] Project setup: folder structure, `package.json`, pre-commit hooks
+- [ ] CLI: `create` and `implement` commands (Commander + Chalk + Ora)
+- [ ] `RepoManager`: clone, init, branch, commit, push
+- [ ] Template Engine: Nunjucks loader + variable substitution
+- [ ] Base templates: `api-fastapi`, `api-express`, `webapp-angular`
+- [ ] Tests: coverage ≥ 60%
 
-#### Sprint 1–2: Foundation
-- [ ] Project setup: folder structure, poetry/pip, pre-commit hooks
-- [ ] Config manager: load .env, validate required variables
-- [ ] Basic CLI: text input, display progress (Rich library)
-- [ ] Repo Manager: clone, create branch, commit, push (no PR yet)
-- [ ] Executor Service: run commands, capture output
+#### Sprint 2 — Scaffolder + LLM (#7)
+- [ ] `ModelRouter`: Gemini SDK + Ollama via axios + fallback logic
+- [ ] `ScaffolderService`: template rendering + LLM-generated files
+- [ ] LLM-generated README, auth module, and initial tests
+- [ ] Tests: coverage ≥ 70%
 
-#### Sprint 3–4: Core Agents
-- [ ] Planner Agent: receive demand → generate simple plan (no complex DAG)
-- [ ] Coder Agent: implement subtask → FileChanges
-- [ ] Model Router: OpenAI + fallback to Ollama
-- [ ] Basic loop: plan → implement → test (1 iteration, no auto-correction)
+#### Sprint 3 — Implement Mode (#10)
+- [ ] `PlannerAgent`: createPlan(demand, repoPath) → Plan
+- [ ] `CoderAgent`: implementPlan(plan, repoPath) → FileChange[]
+- [ ] `TesterAgent`: generateTests(changes, repoPath) → string[]
+- [ ] `ExecutorService`: detect + run linter/typecheck/tests
+- [ ] Tests: coverage ≥ 75%
 
-#### Sprint 5–6: Integration & Testing
-- [ ] GitHub Provider integration: read Issue, create PR
-- [ ] Test Agent: generate basic tests (pytest)
-- [ ] Validation: run pytest and capture result
-- [ ] End-to-end: simple demand → functional PR
-- [ ] System unit tests (coverage > 60%)
-
-**MVP Deliverable:**
-- CLI that accepts text or Issue
-- Generates plan, asks for confirmation
-- Implements simple changes
-- Creates basic tests
-- Opens PR on GitHub
-
----
-
-### V1 (Production-Ready) — 8–12 weeks
-
-**Goal:** Robust system with auto-correction, vector store, memory.
-
-#### Sprint 7–8: Vector Store & RAG
-- [ ] Indexer Service: scan repo, chunking, embeddings
-- [ ] FAISS integration: create/save/load index
-- [ ] Semantic search: retrieve context before generating code
-- [ ] Incremental indexing: reindex only modified files
-
-#### Sprint 9–10: Auto-Correction
-- [ ] Feedback Loop: implement correction cycle (max 3 attempts)
-- [ ] Error Diagnoser: parsers for pytest, eslint, mypy, etc.
-- [ ] Memory Service: SQLite schema, store/query executions
-- [ ] Pattern Learner: automatically detect repo patterns
-
-#### Sprint 11–12: Robustness & Quality
-- [ ] Checkpoint system: save state, allow resume
-- [ ] Confirmations: destructive actions, large changes
-- [ ] Secret redaction: detect and mask
-- [ ] Reviewer Agent: quality analysis before PR
-- [ ] Structured logs: optional JSON output
-- [ ] Test coverage > 80%
-
-**V1 Deliverable:**
-- Auto-correction of errors (up to 3 attempts)
-- RAG with vector store for rich context
-- Persistent memory between executions
-- Security and confirmations
-- Ready for production use (real projects)
+#### Sprint 4 — GitHub Integration + Polish (#15)
+- [ ] GitHub Provider: read Issues, create PRs via API
+- [ ] `MainOrchestrator`: wire all modules together
+- [ ] UX: Rich spinners, phase status, confirmations
+- [ ] Error handling: all errors produce actionable messages
+- [ ] E2E tests: real CREATE and IMPLEMENT scenarios
+- [ ] Tests: coverage ≥ 80%
+- [ ] **Delivery: MVP v1.0.0 🚀**
 
 ---
 
-### V2 (Advanced Features) — 12–16 weeks
+### V1 — Weeks 9–14
 
-**Goal:** GUI, multi-language, advanced integrations.
+- [ ] Auto-correction loop (max 3 attempts)
+- [ ] RAG with FAISS (Python subprocess bridge or `faiss-node`)
+- [ ] Persistent memory (SQLite via `better-sqlite3`)
+- [ ] Pattern Learner: detect naming convention, test style
+- [ ] More templates: React, Vue, Django
+- [ ] Complex features (5–10 files)
 
-#### Sprint 13–14: Graphical Interface
-- [ ] Electron/Tauri setup
-- [ ] Angular frontend: main components
-  - Dashboard: status, progress
-  - Plan Viewer: subtask tree
-  - Diff Viewer: syntax-highlighted diffs
-  - Test Results: test table
-- [ ] WebSocket: real-time CLI ↔ GUI communication
-- [ ] State sync: same execution visible in CLI and GUI
+---
 
-#### Sprint 15–16: Expansion
-- [ ] More language support: Go, Rust, Java
-- [ ] GitLab and Bitbucket providers
-- [ ] ChromaDB / LanceDB as FAISS alternatives
-- [ ] IDE integrations: VSCode extension (optional)
-- [ ] CI/CD integration: run as GitHub Action
-- [ ] Telemetry: usage metrics (optional, opt-in)
+### V2 — Weeks 15–18
 
-**V2 Deliverable:**
-- Complete and user-friendly GUI
-- Support for multiple languages and Git providers
-- Extensibility via plugins
-- Integration with development tools
+- [ ] GUI: Electron + Angular
+- [ ] WebSocket: real-time CLI ↔ GUI
+- [ ] Multi-repo support
+- [ ] IDE integrations (VSCode extension)
+- [ ] GitLab + Bitbucket providers
 
 ---
 
 ## 8. OPEN DECISIONS
 
-### Critical Questions (Blockers)
+### Critical
 
-#### 1. Business Model & Licensing
-**Question:** Will the software be open-source (MIT/Apache) or proprietary? Will there be a paid/enterprise version?  
-**Recommendation:** Open-source (Apache 2.0) with an "open-core" model (optional paid enterprise features: cloud sync, analytics, team features).
+1. **RAG in V1:** Node.js lacks native FAISS/sentence-transformers. Options: (a) call a Python microservice, (b) use `faiss-node` (limited), (c) use a cloud vector DB (Pinecone free tier). **Recommendation:** Python subprocess bridge for V1, evaluate `faiss-node` maturity.
 
-#### 2. Default Embedding Provider
-**Question:** Which embedding provider to use by default? OpenAI (paid, high quality) or local (free, lower quality)?  
-**Options:**
-- OpenAI `text-embedding-3-small` (~$0.02/1M tokens, fast, accurate)
-- HuggingFace local (`sentence-transformers/all-MiniLM-L6-v2`, free, ~400MB RAM)
-- Ollama local (`nomic-embed-text`, free, requires Ollama)  
-**Recommendation:** OpenAI by default (best experience), with fallback to HuggingFace local if API key is not configured.
+2. **Embedding provider:** With Node.js, the best zero-cost options are `@xenova/transformers` (local, WASM-based) or Gemini Embeddings API. **Recommendation:** Gemini Embeddings for V1 (already integrated), fallback to `@xenova/transformers`.
 
-#### 3. Repository Size Limit
-**Question:** What is the indexing limit? Should repos with 100k+ files be supported?  
-**Recommendation:**
-- Default: up to 10k files (configurable via `MAX_FILES_INDEX`)
-- For larger repos: allow selective indexing (e.g., only `src/`, `lib/`)
-- Warning if limit is exceeded
-
-#### 4. Memory Versioning Strategy
-**Question:** Is memory global per repo or per branch? Does learning from one branch contaminate another?  
-**Recommendation:** Hybrid — base repo memory + branch-specific context override.
+3. **Business model:** Open-source (MIT) with optional paid cloud features. No changes from V1 spec.
 
 ---
 
-### Important Questions (Medium Impact)
+### Implementation
 
-#### 5. Commit Message Format
-**Question:** Enforce Conventional Commits or allow free format?  
-**Recommendation:** Detect if the repo already uses Conventional Commits (via history) and adapt. If not detected, use free descriptive format.
+4. **AST vs string manipulation:** For TypeScript files, use `ts-morph` for precise AST-based edits. For Python files generated by EnginAI, use LLM + syntax validation. **Default:** LLM-based with `tsc --noEmit` or `ast.parse` as guard.
 
-#### 6. Integration Test Execution
-**Question:** Run integration tests automatically or only unit tests?  
-**Recommendation:** MVP — unit tests only. V1 — allow optionally with `--run-integration` flag.
+5. **Commit message format:** Auto-detect Conventional Commits from repo history. Default: `feat: <plan title>`.
 
-#### 7. Handling Secrets in Code
-**Question:** If the agent detects hardcoded secrets in existing code, should it alert? Auto-fix?  
-**Recommendation:** Always alert, but never auto-fix (risk of breaking functionality). Suggest migration to .env.
-
-#### 8. Multi-Repo Support
-**Question:** Support changes across multiple repositories in a single demand? (e.g., API + Frontend)  
-**Recommendation:** Not in MVP. V2 — support with cross-repo orchestration.
+6. **Rate limiting:** Exponential backoff already implemented in `ModelRouter`. For Ollama, no rate limiting needed.
 
 ---
 
-### User Experience Questions
+## 9. ACCEPTANCE CRITERIA
 
-#### 9. Default Verbosity Level
-**Question:** Should the CLI be verbose by default or silent (progress only)?  
-**Recommendation:** Moderate — show main phases + progress bars. `--verbose` mode for debugging.
+### MVP
+- [ ] `enginai create --type api --name my-api --language typescript --framework express` produces a runnable project
+- [ ] `enginai implement --repo <url> --text "add GET /health"` opens a real PR
+- [ ] All errors produce actionable, user-friendly messages
+- [ ] Test coverage ≥ 80%
 
-#### 10. Execution Cancellation
-**Question:** Allow Ctrl+C at any time? How to handle partial state?  
-**Recommendation:**
-- Ctrl+C → automatically save checkpoint
-- Next execution → ask "Resume previous execution?"
-- `--clean` option to ignore checkpoints
+### V1
+- [ ] On test failure, agent iterates and fixes (up to 3 attempts)
+- [ ] RAG retrieves relevant context before generating code
+- [ ] Persistent memory informs decisions across executions
+- [ ] Structured logs and checkpoints functional
 
-#### 11. Automatic Agent Updates
-**Question:** Should the CLI automatically check for updates? Auto-update?  
-**Recommendation:** Check on startup (non-blocking), display notification. No auto-update (user decides via `pip install --upgrade enginai`).
-
----
-
-### Technical Implementation Questions
-
-#### 12. AST vs String Manipulation
-**Question:** For code modification, use AST parsing (more precise, complex) or regex/LLM directly (simpler, risk of breaking)?  
-**Recommendation:** Hybrid — Python/TypeScript: try AST first (`ast`/`babel`), fallback to LLM. Other languages: LLM directly with subsequent syntax validation.
-
-#### 13. LLM API Rate Limiting
-**Question:** How to handle rate limits (e.g., OpenAI 500 req/min)?  
-**Recommendation:**
-- Implement retry with exponential backoff
-- Batch requests when possible
-- Show transparent progress ("Waiting for rate limit...")
-
-#### 14. Python/Node Environment Isolation
-**Question:** Create virtualenv/node_modules automatically or assume it already exists?  
-**Recommendation:** Detect and use existing. If none, alert user and guide creation (do not create automatically — may conflict with workflow).
-
----
-
-## 9. DETAILED FUNCTIONAL REQUIREMENTS
-
-### 9.1 Demand Input & Understanding
-- Accept requests as free text (e.g., "create a REST API for user registration")
-- Read Issues from Git provider (priority: GitHub)
-- If ambiguous, ask objective questions before starting
-- Support contextual attachments: log snippets, stack traces, links, and local files
-
-### 9.2 Task Planning (Planner)
-- Transform demand into a plan with clear subtasks, acceptance criteria, and dependencies
-- Per subtask: probable files, test strategy, risks, validations
-- Reviewable plan: always present and ask "confirm / adjust"
-
-### 9.3 Repository Operations (Repo Manager)
-- Clone repository (HTTPS/SSH), check base branch, create working branch
-- Create/edit/delete code files, configs, and tests
-- Commit with consistent messages (Conventional Commits optional)
-- Push to remote and open Pull Request
-- Link PR to Issue and include description with summary, tests, and impacts
-
-### 9.4 Processing & Semantic Search (Indexer + Vector Store)
-- Process full project: file tree, detect languages/frameworks/patterns
-- Create embeddings and local vector index (FAISS default)
-- Chunking with configurable size/overlap, ignore vendor/artifacts
-- Persist index and allow incremental reindex
-
-### 9.5 Code Execution (Executor)
-- Generate changes in cycles: implement → test → validate → fix
-- Use project tools: test runner, linter, formatter, typecheck
-- Capture output, interpret errors, suggest and apply fixes
-- Safe mode (read-only) and apply-changes mode
-
-### 9.6 Mandatory Unit Tests
-- Create/update appropriate tests for every activity
-- Ensure red/green pattern when possible
-- Report coverage and gaps
-
-### 9.7 Validation & Auto-Correction
-- Local pipeline: lint → typecheck → unit tests
-- On failure: diagnosis with cause, file/line, hypothesis, and plan
-- Repeat loop until acceptance or request user intervention
-
-### 9.8 Memory & Context (Project Memory)
-- History: decisions, recurring errors, commands, patterns
-- Learn from failures: post-mortem and heuristics
-- Local persistence (SQLite/JSONL) scoped per repo/branch/issue
-
-### 9.9 Interface (CLI + GUI)
-- CLI: progress, structured logs, verbose mode, confirmations
-- GUI: plan, diffs, results, control buttons
-- Both: explain actions in plain language, indicate status
-
-### 9.10 Multi-Model (Model Router)
-- Support multiple models (cloud via API, local via Ollama)
-- Task-based routing: fast/strong/cheap model as needed
-- Fallback: switch provider while maintaining context
-
----
-
-## 10. NON-FUNCTIONAL REQUIREMENTS
-
-### 10.1 Security
-- Never expose secrets in logs, PRs, or prompts
-- Automatically redact tokens/keys when capturing logs
-- Confirm destructive actions and critical Git operations
-
-### 10.2 Reliability
-- Idempotent operations when possible
-- Checkpoints: save state between steps
-
-### 10.3 Performance
-- Incremental indexing and embedding cache
-- Support for large repositories (configurable limits)
-
-### 10.4 Portability
-- Run on Windows/Linux/macOS
-- Simple installation (CLI) and optional GUI
-
-### 10.5 Observability
-- Structured logs (optional JSON), levels (INFO/WARN/ERROR)
-- Final report per execution
-
-### 10.6 Extensibility
-- Modular architecture: Git Provider, Vector Store, Embeddings, Test Runners, Model Providers
-
----
-
-## 11. RECOMMENDED TECH STACK
-
-### Core
-- **Language:** Python 3.11+
-- **Dependency Manager:** Poetry
-- **Data Validation:** Pydantic v2
-- **Async Runtime:** asyncio + aiohttp
-
-### CLI
-- **Interface:** Rich (progress bars, tables, prompts)
-- **Args Parsing:** Click or Typer
-
-### Git
-- **Library:** GitPython or pygit2
-
-### Vector Store
-- **Default:** FAISS (local)
-- **Alternatives:** ChromaDB, LanceDB
-
-### LLM Providers
-- **OpenAI:** openai SDK
-- **Anthropic:** anthropic SDK
-- **Ollama:** httpx (HTTP direct)
-
-### Persistence
-- **Memory:** SQLite
-- **ORM:** SQLAlchemy (optional) or raw SQL
-
-### GUI (V2)
-- **Runtime:** Electron or Tauri
-- **Frontend:** Angular + TypeScript
-- **Communication:** WebSocket (Socket.IO or native)
-
-### Testing
-- **Framework:** pytest
-- **Coverage:** pytest-cov
-- **Mocking:** pytest-mock
-
----
-
-## 12. NEXT STEPS
-
-1. **Validate critical decisions** (questions 1–4) with stakeholders
-2. **Create architectural prototype** (1-week spike):
-   - Basic Orchestrator
-   - OpenAI integration
-   - Simple FAISS indexing
-   - Git clone + commit
-3. **Project setup:**
-   - Create repository
-   - Folder structure
-   - Poetry init
-   - Pre-commit hooks (black, ruff, mypy)
-4. **Start MVP Sprint 1**
-
----
-
-## 13. PRODUCT ACCEPTANCE CRITERIA
-
-### For MVP
-- [ ] Given a real Issue, the agent clones the repo, indexes it, proposes a plan
-- [ ] User can confirm/adjust the plan
-- [ ] Agent implements, creates tests, runs validations
-- [ ] Agent commits, pushes, and opens a PR
-- [ ] PR contains: description, change summary, executed tests
-
-### For V1
-- [ ] On test failure, agent iterates and fixes (up to 3x)
-- [ ] Persistent memory: previous executions inform decisions
-- [ ] Functional RAG: relevant context retrieved before generating code
-- [ ] Security: confirmations for destructive actions, masked secrets
-- [ ] Functional structured logs and checkpoints
-
-### For V2
-- [ ] GUI and CLI maintain the same state
-- [ ] Support for 5+ languages (Python, TS, JS, Go, Rust)
+### V2
+- [ ] GUI and CLI maintain the same execution state
+- [ ] Support for 3+ languages (TypeScript, Python, Go)
 - [ ] 3+ Git providers (GitHub, GitLab, Bitbucket)
-- [ ] Extensible via plugins
-- [ ] Complete documentation + examples
 
 ---
 
-**Document generated on:** January 22, 2026  
-**Status:** Draft — Awaiting validation of critical decisions  
-**Next review:** After Sprint 1
+**Document updated:** March 17, 2026  
+**Stack:** Node.js 20+ + TypeScript 5.5+  
+**Status:** MVP in active development (Sprint 3–4)
