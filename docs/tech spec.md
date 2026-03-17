@@ -1,8 +1,8 @@
-# AI Dev Agent - Especificação Técnica e Plano de Implementação
+# enginai - Especificação Técnica e Plano de Implementação
 
 **Versão:** 1.0  
 **Data:** 22 de Janeiro de 2026  
-**Autor:** Especificação técnica gerada para AI Dev Agent
+**Autor:** Especificação técnica gerada para enginai
 
 ---
 
@@ -646,7 +646,7 @@ class VectorStore(ABC):
 # Ambiente
 APP_ENV=dev
 LOG_LEVEL=INFO
-WORKDIR=~/.aidevagent/workspace
+WORKDIR=~/.enginai/workspace
 
 # Git
 GIT_PROVIDER=github
@@ -662,7 +662,7 @@ EMBEDDING_BATCH_SIZE=100
 
 # Vector Store
 VECTOR_STORE=faiss
-VECTOR_DB_PATH=~/.aidevagent/vectordb
+VECTOR_DB_PATH=~/.enginai/vectordb
 MAX_FILES_INDEX=10000
 IGNORE_GLOBS=node_modules/**,dist/**,.venv/**,build/**,*.min.js
 
@@ -685,7 +685,7 @@ LINT_COMMAND_OVERRIDE=
 MAX_EXECUTION_TIME=300
 
 # Memória
-MEMORY_DB_PATH=~/.aidevagent/memory.db
+MEMORY_DB_PATH=~/.enginai/memory.db
 ENABLE_LEARNING=true
 ```
 
@@ -1028,7 +1028,7 @@ class ExecutionError:
 
 #### 11. Atualização Automática do Agente
 **Pergunta:** O CLI deve verificar atualizações automaticamente? Auto-update?  
-**Recomendação:** Verificar ao iniciar (não-bloqueante), exibir notificação. Não fazer auto-update (usuário decide via `pip install --upgrade`).
+**Recomendação:** Verificar ao iniciar (não-bloqueante), exibir notificação. Não fazer auto-update (usuário decide via `pip install --upgrade enginai`).
 
 ---
 
