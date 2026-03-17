@@ -1,4 +1,4 @@
-# 🤖 AI Dev Agent
+# 🤖 enginai
 
 Creates complete applications from scratch and implements features automatically using AI.
 
@@ -13,8 +13,8 @@ Creates complete applications from scratch and implements features automatically
 
 ```bash
 # Clone the repository
-git clone https://github.com/ElioNeto/engin.git
-cd engin
+git clone https://github.com/ElioNeto/enginai.git
+cd enginai
 
 # Install dependencies
 pip install -r requirements.txt
@@ -38,7 +38,7 @@ python -m src.cli.main implement --text "add GET /users endpoint" --repo "https:
 ## 📁 Project Structure
 
 ```
-engin/
+enginai/
 ├── src/
 │   ├── agents/
 │   │   ├── planner.py     # Breaks demand into subtasks
