@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Ask a Question (Discussions)
+    url: https://github.com/ElioNeto/enginai/discussions
+    about: Use Discussions for questions, ideas, and general feedback.
+  - name: 📖 Documentation
+    url: https://github.com/ElioNeto/enginai/blob/main/README.md
+    about: Check the docs before opening an issue.
+  - name: 🔒 Report a Security Vulnerability
+    url: https://github.com/ElioNeto/enginai/security/advisories/new
+    about: Please report security issues privately.

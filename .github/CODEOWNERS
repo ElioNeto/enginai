@@ -1,0 +1,10 @@
+# Global owner — review required for all changes
+* @ElioNeto
+
+# Core architecture
+/src/core/ @ElioNeto
+/src/agents/ @ElioNeto
+
+# Documentation
+/docs/ @ElioNeto
+*.md @ElioNeto

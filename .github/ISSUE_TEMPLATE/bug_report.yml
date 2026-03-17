@@ -1,0 +1,72 @@
+name: 🐛 Bug Report
+description: Report a reproducible bug in EnginAI
+labels: ["bug", "needs-triage"]
+assignees:
+  - ElioNeto
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in as much detail as possible.
+        **⚠️ Never include API keys, tokens, or passwords in your report.**
+
+  - type: input
+    id: version
+    attributes:
+      label: EnginAI version / Git SHA
+      placeholder: e.g. v0.2.0 or abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js version
+      placeholder: e.g. v20.12.0  (run `node --version`)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: e.g. Ubuntu 22.04 / Windows 11 / macOS 14
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Run `enginai create ...`
+        2. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs / Error Output
+      description: Paste logs here. Redact any secrets or tokens!
+      render: shell
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I removed all secrets and tokens from this report
+          required: true
+        - label: I am using Node.js 20+
+          required: false
