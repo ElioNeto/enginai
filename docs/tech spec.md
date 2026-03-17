@@ -1,29 +1,29 @@
-# enginai - Especificação Técnica e Plano de Implementação
+# EnginAI — Technical Specification & Implementation Plan
 
-**Versão:** 1.0  
-**Data:** 22 de Janeiro de 2026  
-**Autor:** Especificação técnica gerada para enginai
-
----
-
-## VISÃO DO PRODUTO
-
-Construir uma aplicação que receba uma demanda (texto livre ou uma Issue), entenda e quebre em subtarefas, implemente mudanças de código com testes unitários, rode validações, faça commit/push e abra um PR. O sistema deve manter memória do projeto e aprender com falhas anteriores, explicando continuamente o que está fazendo e pedindo confirmação quando necessário.
-
-**Público-alvo:** Desenvolvedores que trabalham com Python, Angular/TypeScript, automações e scripts de processamento (ex.: ffmpeg).
+**Version:** 1.0  
+**Date:** January 22, 2026  
+**Author:** Technical specification for EnginAI
 
 ---
 
-## 1. ARQUITETURA DO SISTEMA
+## PRODUCT VISION
 
-### 1.1 Visão Geral da Arquitetura
+Build an application that receives a demand (free text or an Issue), understands and breaks it into subtasks, implements code changes with unit tests, runs validations, commits/pushes, and opens a PR. The system should maintain project memory and learn from past failures, continuously explaining what it is doing and asking for confirmation when necessary.
 
-O sistema adota uma **arquitetura hierárquica de agentes com loop de feedback e RAG compartilhado**, onde um orquestrador central coordena agentes especializados que colaboram em ciclos iterativos até atingir os critérios de aceite.
+**Target audience:** Developers working with Python, Angular/TypeScript, automations, and processing scripts (e.g., ffmpeg).
+
+---
+
+## 1. SYSTEM ARCHITECTURE
+
+### 1.1 Architecture Overview
+
+The system adopts a **hierarchical agent architecture with feedback loop and shared RAG**, where a central orchestrator coordinates specialized agents that collaborate in iterative cycles until acceptance criteria are met.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     ORCHESTRATOR                            │
-│                  (Coordenador Central)                      │
+│                  (Central Coordinator)                      │
 └────────────┬────────────────────────────────────────────────┘
              │
     ┌────────┴────────┐
@@ -34,8 +34,8 @@ O sistema adota uma **arquitetura hierárquica de agentes com loop de feedback e
 └───┬────┘      └────┬─────┘      └──────┬───┘
     │                │                   │
     │         ┌──────▼──────┐            │
-    │         │   Executor  │            │
-    └────────►│   Service   │◄───────────┘
+    └────────►│   Executor  │◄───────────┘
+              │   Service   │
               └──────┬──────┘
                      │
     ┌────────────────┼────────────────┐
@@ -46,29 +46,29 @@ O sistema adota uma **arquitetura hierárquica de agentes com loop de feedback e
 └────────┘    └───────────┘    └──────────┘
 ```
 
-### 1.2 Camadas Arquiteturais
+### 1.2 Architectural Layers
 
 **Layer 1: Interface (UI Layer)**
-- CLI: Rich-based terminal UI com progress bars, tabelas e prompts interativos
-- GUI: Electron/Tauri com frontend Angular
-- API REST local (opcional): para integração com IDEs
+- CLI: Rich-based terminal UI with progress bars, tables, and interactive prompts
+- GUI: Electron/Tauri with Angular frontend
+- Local REST API (optional): for IDE integration
 
 **Layer 2: Orchestration (Domain Layer)**
-- MainOrchestrator: fluxo end-to-end (ingestion → planning → execution → PR)
-- TaskCoordinator: gerencia filas de subtarefas e dependências
-- FeedbackLoop: implementa ciclos de correção automática
+- MainOrchestrator: end-to-end flow (ingestion → planning → execution → PR)
+- TaskCoordinator: manages subtask queues and dependencies
+- FeedbackLoop: implements automatic correction cycles
 
 **Layer 3: Agents (Domain Services)**
-- PlannerAgent: decomposição de demanda em plano estruturado
-- CoderAgent: geração de código e modificações
-- ReviewerAgent: análise de qualidade e sugestões
-- TestAgent: criação e execução de testes
+- PlannerAgent: decomposes demand into a structured plan
+- CoderAgent: code generation and modifications
+- ReviewerAgent: quality analysis and suggestions
+- TestAgent: test creation and execution
 
 **Layer 4: Services (Application Services)**
-- IndexerService: chunking, embeddings, indexação vetorial
-- ExecutorService: execução de comandos (lint/test/build)
-- RepoManager: operações Git (clone, branch, commit, push, PR)
-- MemoryService: persistência de contexto e aprendizado
+- IndexerService: chunking, embeddings, vector indexing
+- ExecutorService: command execution (lint/test/build)
+- RepoManager: Git operations (clone, branch, commit, push, PR)
+- MemoryService: context persistence and learning
 
 **Layer 5: Adapters (Infrastructure)**
 - GitProviders: GitHub, GitLab, Bitbucket
@@ -77,36 +77,36 @@ O sistema adota uma **arquitetura hierárquica de agentes com loop de feedback e
 - EmbeddingProviders: OpenAI, HuggingFace, local
 
 **Layer 6: Data (Persistence)**
-- SQLite: metadados, memória, histórico
-- File System: workspace, cache, índices
-- Remote: Git repos, object storage (opcional)
+- SQLite: metadata, memory, history
+- File System: workspace, cache, indexes
+- Remote: Git repos, object storage (optional)
 
 ---
 
-## 2. MÓDULOS PRINCIPAIS
+## 2. CORE MODULES
 
 ### 2.1 Orchestrator Module
 
-**Responsabilidade:** Coordenar o fluxo completo end-to-end.
+**Responsibility:** Coordinate the complete end-to-end flow.
 
-**Componentes:**
-- `MainOrchestrator`: entry point, gerencia fases (ingest → plan → execute → finalize)
-- `PhaseManager`: state machine para transições de fase
-- `CheckpointManager`: salvar/restaurar estado entre fases
-- `ConfirmationHandler`: solicitar aprovações do usuário
+**Components:**
+- `MainOrchestrator`: entry point, manages phases (ingest → plan → execute → finalize)
+- `PhaseManager`: state machine for phase transitions
+- `CheckpointManager`: save/restore state between phases
+- `ConfirmationHandler`: request user approvals
 
 **Interface:**
 ```python
 class MainOrchestrator:
     async def execute_task(
         self,
-        input: TaskInput,  # texto ou Issue
+        input: TaskInput,  # text or Issue
         mode: ExecutionMode,  # plan_only | execute | auto
         checkpoint_file: Optional[Path] = None
     ) -> ExecutionResult
 ```
 
-**Modelos de Dados:**
+**Data Models:**
 ```python
 @dataclass
 class TaskInput:
@@ -130,13 +130,13 @@ class ExecutionResult:
 
 ### 2.2 Planner Module
 
-**Responsabilidade:** Transformar demanda em plano executável com subtarefas.
+**Responsibility:** Transform a demand into an executable plan with subtasks.
 
-**Componentes:**
-- `DemandAnalyzer`: extrair requisitos e identificar ambiguidades
-- `TaskDecomposer`: quebrar em subtarefas com dependências (DAG)
-- `AcceptanceCriteriaGenerator`: definir validações por subtarefa
-- `QuestionGenerator`: formular perguntas de esclarecimento
+**Components:**
+- `DemandAnalyzer`: extract requirements and identify ambiguities
+- `TaskDecomposer`: break into subtasks with dependencies (DAG)
+- `AcceptanceCriteriaGenerator`: define validations per subtask
+- `QuestionGenerator`: formulate clarification questions
 
 **Interface:**
 ```python
@@ -155,7 +155,7 @@ class PlannerAgent:
     ) -> List[Question]
 ```
 
-**Modelos de Dados:**
+**Data Models:**
 ```python
 @dataclass
 class Plan:
@@ -182,14 +182,14 @@ class SubTask:
 
 ### 2.3 Indexer & Vector Store Module
 
-**Responsabilidade:** Processar repo completo, criar embeddings e permitir busca semântica.
+**Responsibility:** Process the full repo, create embeddings, and enable semantic search.
 
-**Componentes:**
-- `RepoScanner`: ler árvore, detectar linguagens/frameworks
-- `Chunker`: dividir arquivos em chunks semânticos
-- `EmbeddingGenerator`: gerar embeddings (batch)
-- `VectorStoreManager`: CRUD no índice vetorial
-- `SemanticRetriever`: buscar contexto relevante
+**Components:**
+- `RepoScanner`: read file tree, detect languages/frameworks
+- `Chunker`: split files into semantic chunks
+- `EmbeddingGenerator`: generate embeddings (batch)
+- `VectorStoreManager`: CRUD on the vector index
+- `SemanticRetriever`: search for relevant context
 
 **Interface:**
 ```python
@@ -208,13 +208,13 @@ class IndexerService:
     ) -> List[SearchResult]
 ```
 
-**Estratégia de Chunking:**
-- Tamanho base: 512 tokens (ajustável por linguagem)
+**Chunking Strategy:**
+- Base size: 512 tokens (adjustable per language)
 - Overlap: 50 tokens
-- Respeitar estrutura: classes/funções completas quando possível
-- Filtros: ignorar `node_modules/`, `dist/`, `.venv/`, `build/`, `*.min.js`, etc.
+- Respect structure: complete classes/functions when possible
+- Filters: ignore `node_modules/`, `dist/`, `.venv/`, `build/`, `*.min.js`, etc.
 
-**Metadados por chunk:**
+**Per-chunk Metadata:**
 ```python
 @dataclass
 class ChunkMetadata:
@@ -224,28 +224,28 @@ class ChunkMetadata:
     end_line: int
     language: str
     file_type: str  # source | test | config
-    symbols: List[str]  # funções/classes detectadas
+    symbols: List[str]  # detected functions/classes
     timestamp: datetime
 ```
 
-**Vector Stores Suportados:**
-- **FAISS** (padrão): local, rápido, zero custo
-- **ChromaDB**: local, API simples, boa para desenvolvimento
-- **LanceDB + S3**: produção, escalável
-- **PostgreSQL + pgvector**: se já usa Postgres
+**Supported Vector Stores:**
+- **FAISS** (default): local, fast, zero cost
+- **ChromaDB**: local, simple API, great for development
+- **LanceDB + S3**: production, scalable
+- **PostgreSQL + pgvector**: if already using Postgres
 
 ---
 
 ### 2.4 Repo Manager Module
 
-**Responsabilidade:** Operações Git e criação de PRs.
+**Responsibility:** Git operations and PR creation.
 
-**Componentes:**
-- `GitClient`: wrapper sobre GitPython/pygit2
-- `BranchManager`: criar/deletar branches
-- `CommitBuilder`: mensagens consistentes (Conventional Commits opcional)
-- `PRCreator`: abrir PR via API do provedor
-- `ConflictResolver`: detectar conflitos e orientar resolução
+**Components:**
+- `GitClient`: wrapper over GitPython/pygit2
+- `BranchManager`: create/delete branches
+- `CommitBuilder`: consistent messages (Conventional Commits optional)
+- `PRCreator`: open PR via provider API
+- `ConflictResolver`: detect conflicts and guide resolution
 
 **Interface:**
 ```python
@@ -281,14 +281,14 @@ class RepoManager:
     ) -> PullRequest
 ```
 
-**Modelos de Dados:**
+**Data Models:**
 ```python
 @dataclass
 class FileChange:
     operation: Literal["create", "update", "delete"]
     path: str
     content: Optional[str]
-    original_sha: Optional[str]  # para updates
+    original_sha: Optional[str]  # for updates
 
 @dataclass
 class PullRequest:
@@ -303,13 +303,13 @@ class PullRequest:
 
 ### 2.5 Executor Module
 
-**Responsabilidade:** Executar ferramentas externas (lint, test, typecheck) e capturar resultados.
+**Responsibility:** Run external tools (lint, test, typecheck) and capture results.
 
-**Componentes:**
-- `CommandRunner`: executar comandos com timeout e capture
-- `ToolDetector`: identificar ferramentas disponíveis no projeto
-- `OutputParser`: interpretar stdout/stderr de ferramentas conhecidas
-- `ErrorDiagnoser`: analisar erros e sugerir correções
+**Components:**
+- `CommandRunner`: execute commands with timeout and capture
+- `ToolDetector`: identify tools available in the project
+- `OutputParser`: interpret stdout/stderr from known tools
+- `ErrorDiagnoser`: analyze errors and suggest fixes
 
 **Interface:**
 ```python
@@ -335,13 +335,13 @@ class ExecutorService:
     ) -> TestResult
 ```
 
-**Ferramentas Detectadas Automaticamente:**
+**Auto-detected Tools:**
 
-| Linguagem | Linter | Formatter | Typecheck | Test Runner |
-|-----------|--------|-----------|-----------|-------------|
+| Language | Linter | Formatter | Typecheck | Test Runner |
+|---|---|---|---|---|
 | Python | ruff/flake8/pylint | black/ruff | mypy/pyright | pytest/unittest |
 | TypeScript | eslint | prettier | tsc | jest/vitest |
-| JavaScript | eslint | prettier | - | jest/mocha |
+| JavaScript | eslint | prettier | — | jest/mocha |
 | Go | golangci-lint | gofmt | go build | go test |
 | Rust | clippy | rustfmt | cargo check | cargo test |
 
@@ -349,13 +349,13 @@ class ExecutorService:
 
 ### 2.6 Coder Agent Module
 
-**Responsabilidade:** Gerar/modificar código com base em subtarefas.
+**Responsibility:** Generate/modify code based on subtasks.
 
-**Componentes:**
-- `CodeGenerator`: criar novos arquivos
-- `CodeModifier`: aplicar edições (usando AST quando possível)
-- `DiffGenerator`: produzir diffs legíveis
-- `ContextRetriever`: buscar exemplos similares no repo via vector store
+**Components:**
+- `CodeGenerator`: create new files
+- `CodeModifier`: apply edits (using AST when possible)
+- `DiffGenerator`: produce readable diffs
+- `ContextRetriever`: search similar examples in the repo via vector store
 
 **Interface:**
 ```python
@@ -375,23 +375,23 @@ class CoderAgent:
     ) -> FileChange
 ```
 
-**Fluxo de Geração:**
-1. Recuperar contexto relevante (vector search)
-2. Gerar mudanças com LLM
-3. Validar sintaxe básica
-4. Retornar FileChanges
+**Generation Flow:**
+1. Retrieve relevant context (vector search)
+2. Generate changes with LLM
+3. Validate basic syntax
+4. Return FileChanges
 
 ---
 
 ### 2.7 Test Agent Module
 
-**Responsabilidade:** Criar/atualizar testes unitários.
+**Responsibility:** Create/update unit tests.
 
-**Componentes:**
-- `TestScaffolder`: criar estrutura de testes para novos arquivos
-- `TestGenerator`: gerar casos de teste baseado no código
-- `TestUpdater`: atualizar testes existentes
-- `CoverageAnalyzer`: analisar cobertura e identificar lacunas
+**Components:**
+- `TestScaffolder`: create test structure for new files
+- `TestGenerator`: generate test cases based on code
+- `TestUpdater`: update existing tests
+- `CoverageAnalyzer`: analyze coverage and identify gaps
 
 **Interface:**
 ```python
@@ -400,7 +400,7 @@ class TestAgent:
         self,
         code_changes: List[FileChange],
         test_framework: str
-    ) -> List[FileChange]  # arquivos de teste
+    ) -> List[FileChange]  # test files
 
     async def analyze_coverage(
         self,
@@ -408,22 +408,22 @@ class TestAgent:
     ) -> CoverageReport
 ```
 
-**Padrão Red/Green:**
-- Sempre tentar rodar testes antes de mudar código (quando aplicável)
-- Confirmar que novos testes falham antes da correção
-- Validar que passam após a correção
+**Red/Green Pattern:**
+- Always try to run tests before changing code (when applicable)
+- Confirm that new tests fail before the fix
+- Validate that they pass after the fix
 
 ---
 
 ### 2.8 Memory & Context Module
 
-**Responsabilidade:** Manter histórico, aprendizado e contexto do projeto.
+**Responsibility:** Maintain history, learning, and project context.
 
-**Componentes:**
-- `MemoryStore`: persistência em SQLite
-- `DecisionLogger`: registrar decisões técnicas
-- `ErrorTracker`: rastrear erros recorrentes
-- `PatternLearner`: extrair padrões do repo (naming, estrutura, etc.)
+**Components:**
+- `MemoryStore`: SQLite persistence
+- `DecisionLogger`: record technical decisions
+- `ErrorTracker`: track recurring errors
+- `PatternLearner`: extract patterns from the repo (naming, structure, etc.)
 
 **Interface:**
 ```python
@@ -450,9 +450,9 @@ class MemoryService:
     ) -> List[ErrorResolution]
 ```
 
-**Schema SQLite:**
+**SQLite Schema:**
 ```sql
--- Execuções
+-- Executions
 CREATE TABLE executions (
     id TEXT PRIMARY KEY,
     repo_url TEXT,
@@ -463,7 +463,7 @@ CREATE TABLE executions (
     completed_at TIMESTAMP
 );
 
--- Decisões
+-- Decisions
 CREATE TABLE decisions (
     id TEXT PRIMARY KEY,
     execution_id TEXT,
@@ -474,7 +474,7 @@ CREATE TABLE decisions (
     FOREIGN KEY (execution_id) REFERENCES executions(id)
 );
 
--- Erros e Resoluções
+-- Errors and Resolutions
 CREATE TABLE error_resolutions (
     id TEXT PRIMARY KEY,
     execution_id TEXT,
@@ -487,7 +487,7 @@ CREATE TABLE error_resolutions (
     FOREIGN KEY (execution_id) REFERENCES executions(id)
 );
 
--- Padrões do Projeto
+-- Project Patterns
 CREATE TABLE project_patterns (
     id TEXT PRIMARY KEY,
     repo_url TEXT,
@@ -502,13 +502,13 @@ CREATE TABLE project_patterns (
 
 ### 2.9 Model Router Module
 
-**Responsabilidade:** Rotear requisições para diferentes LLMs baseado na tarefa.
+**Responsibility:** Route requests to different LLMs based on the task.
 
-**Componentes:**
-- `ModelRegistry`: registrar provedores e modelos disponíveis
-- `TaskClassifier`: classificar tipo de tarefa
-- `RoutingStrategy`: decidir qual modelo usar
-- `FallbackHandler`: alternar provedor em caso de falha
+**Components:**
+- `ModelRegistry`: register available providers and models
+- `TaskClassifier`: classify task type
+- `RoutingStrategy`: decide which model to use
+- `FallbackHandler`: switch provider on failure
 
 **Interface:**
 ```python
@@ -527,25 +527,25 @@ class ModelRouter:
     ) -> None
 ```
 
-**Estratégia de Roteamento:**
+**Routing Strategy:**
 
-| Tarefa | Modelo Ideal | Características |
-|--------|--------------|-----------------|
-| Planejamento | GPT-4 / Claude-3.5 | Raciocínio complexo |
-| Geração de código | GPT-4 / Claude-3.5 / Codestral | Precisão, contexto longo |
-| Correção de erros | GPT-4 / Claude-3.5 | Debugging, análise |
-| Sumarização de logs | GPT-3.5 / Llama 3 70B | Custo-benefício |
-| Geração de testes | GPT-4 / Claude-3.5 | Cobertura, edge cases |
-| Code review | GPT-4 / Claude-3.5 | Análise crítica |
+| Task | Ideal Model | Characteristics |
+|---|---|---|
+| Planning | GPT-4 / Claude-3.5 | Complex reasoning |
+| Code generation | GPT-4 / Claude-3.5 / Codestral | Precision, long context |
+| Error fixing | GPT-4 / Claude-3.5 | Debugging, analysis |
+| Log summarization | GPT-3.5 / Llama 3 70B | Cost-effectiveness |
+| Test generation | GPT-4 / Claude-3.5 | Coverage, edge cases |
+| Code review | GPT-4 / Claude-3.5 | Critical analysis |
 
 **Fallback:**
-- Se provedor primário falhar → tentar secundário
-- Manter contexto essencial (não reenviar histórico completo)
-- Logar falhas para análise
+- If primary provider fails → try secondary
+- Maintain essential context (do not resend full history)
+- Log failures for analysis
 
 ---
 
-## 3. INTERFACES EXTERNAS
+## 3. EXTERNAL INTERFACES
 
 ### 3.1 Git Providers
 
@@ -575,8 +575,8 @@ class GitProvider(ABC):
     ) -> None
 ```
 
-**Implementações:**
-- `GitHubProvider`: via PyGithub ou httpx direto
+**Implementations:**
+- `GitHubProvider`: via PyGithub or httpx directly
 - `GitLabProvider`: via python-gitlab
 - `BitbucketProvider`: via requests
 
@@ -598,11 +598,11 @@ class LLMProvider(ABC):
     ) -> CompletionResponse
 ```
 
-**Implementações:**
+**Implementations:**
 - `OpenAIProvider`: via openai SDK
 - `AnthropicProvider`: via anthropic SDK
 - `OllamaProvider`: via httpx
-- `AzureOpenAIProvider`: via openai SDK com custom endpoint
+- `AzureOpenAIProvider`: via openai SDK with custom endpoint
 
 ---
 
@@ -631,19 +631,19 @@ class VectorStore(ABC):
     async def delete(self, ids: List[str]) -> None
 ```
 
-**Implementações:**
-- `FAISSStore`: local, arquivo .index
+**Implementations:**
+- `FAISSStore`: local, .index file
 - `ChromaStore`: ChromaDB client
-- `LanceDBStore`: LanceDB + S3 opcional
+- `LanceDBStore`: LanceDB + optional S3
 
 ---
 
-## 4. CONFIGURAÇÃO E SEGURANÇA
+## 4. CONFIGURATION & SECURITY
 
-### 4.1 Arquivo .env (Template)
+### 4.1 .env File (Template)
 
 ```bash
-# Ambiente
+# Environment
 APP_ENV=dev
 LOG_LEVEL=INFO
 WORKDIR=~/.enginai/workspace
@@ -684,140 +684,72 @@ TEST_COMMAND_OVERRIDE=
 LINT_COMMAND_OVERRIDE=
 MAX_EXECUTION_TIME=300
 
-# Memória
+# Memory
 MEMORY_DB_PATH=~/.enginai/memory.db
 ENABLE_LEARNING=true
 ```
 
-### 4.2 Segurança
+### 4.2 Security
 
-**Redação de Segredos:**
-- Regex para detectar: `(token|key|password|secret)[=:]\s*[^\s]+`
-- Substituir por `***REDACTED***` em logs e PRs
-- Nunca persistir env vars em banco
+**Secret Redaction:**
+- Regex to detect: `(token|key|password|secret)[=:]\s*[^\s]+`
+- Replace with `***REDACTED***` in logs and PRs
+- Never persist env vars in database
 
-**Confirmações Obrigatórias:**
-- Deletar arquivos
+**Mandatory Confirmations:**
+- Delete files
 - Force push
-- Alterar mais de 50 arquivos
-- Executar comandos com sudo/admin
+- Modify more than 50 files
+- Execute commands with sudo/admin
 
 **Sandboxing:**
-- Executar comandos em subprocessos isolados
-- Timeout padrão: 5 minutos
-- Limitar uso de memória (via cgroups em Linux, opcional)
+- Run commands in isolated subprocesses
+- Default timeout: 5 minutes
+- Limit memory usage (via cgroups on Linux, optional)
 
 ---
 
-## 5. FLUXO DE DADOS
+## 5. DATA FLOW
 
-### 5.1 Fluxo Completo (End-to-End)
+### 5.1 Complete Flow (End-to-End)
 
-```
-┌──────────────┐
-│ 1. INGESTION │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐         ┌─────────────┐
-│ 2. QUESTIONS │────────►│ User Input  │
-└──────┬───────┘         └─────────────┘
-       │
-       ▼
-┌──────────────┐         ┌──────────────┐
-│ 3. PLANNING  │◄───────►│ Vector Store │
-└──────┬───────┘         └──────────────┘
-       │
-       ▼
-┌──────────────┐
-│ 4. INDEXING  │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│ 5. IMPLEMENT │◄──┐
-└──────┬───────┘   │
-       │           │
-       ▼           │
-┌──────────────┐   │
-│ 6. TEST      │   │
-└──────┬───────┘   │
-       │           │
-       ▼           │
-┌──────────────┐   │
-│ 7. VALIDATE  │   │
-└──────┬───────┘   │
-       │           │
-       ▼           │
-   ┌──────┐        │
-   │ PASS?│────NO──┘
-   └──┬───┘
-      │ YES
-      ▼
-┌──────────────┐
-│ 8. FINALIZE  │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│ 9. COMMIT/PR │
-└──────────────┘
+```mermaid
+flowchart TD
+    A["📥 1. INGESTION\ntext or Issue URL"] --> B["❓ 2. QUESTIONS\nClarify ambiguities"]
+    B --> C["📋 3. PLANNING\nBreak into subtasks"]
+    C <--> VS[("🗄️ Vector Store")]
+    C --> D["🔍 4. INDEXING\nScan & embed repo"]
+    D --> E["💻 5. IMPLEMENT\nGenerate code changes"]
+    E --> F["🧪 6. TEST\nRun unit tests"]
+    F --> G["✅ 7. VALIDATE\nlint + typecheck"]
+    G --> H{{"Pass?"}}
+    H -->|NO| E
+    H -->|YES| I["📦 8. FINALIZE\nCommit + Push + PR"]
 ```
 
-### 5.2 Loop de Correção Automática
+### 5.2 Auto-Correction Loop
 
-```
-┌─────────────┐
-│ Run Tests   │
-└──────┬──────┘
-       │
-       ▼
-   ┌───────┐
-   │ Pass? │───YES──► Continue
-   └───┬───┘
-       │ NO
-       ▼
-┌──────────────┐
-│ Parse Errors │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐        ┌────────────┐
-│ Search       │───────►│ Memory DB  │
-│ Similar      │        │ (Erros     │
-│ Errors       │        │ anteriores)│
-└──────┬───────┘        └────────────┘
-       │
-       ▼
-┌──────────────┐        ┌────────────┐
-│ Generate Fix │───────►│ LLM (Coder)│
-└──────┬───────┘        └────────────┘
-       │
-       ▼
-┌──────────────┐
-│ Apply Fix    │
-└──────┬───────┘
-       │
-       ▼
-   ┌────────────┐
-   │ Iterations │
-   │ < Max (3)? │──NO──► Ask User
-   └──┬─────────┘
-      │ YES
-      ▼
-   (Loop back to Run Tests)
+```mermaid
+flowchart TD
+    A["▶️ Run Tests"] --> B{{Pass?}}
+    B -->|YES| Z["✅ Continue"]
+    B -->|NO| C["🔍 Parse Errors"]
+    C --> D["🗃️ Search Similar Errors\n(Memory DB)"]
+    D --> E["🤖 Generate Fix\n(LLM - Coder)"]
+    E --> F["📝 Apply Fix"]
+    F --> G{{"Iterations < 3?"}}
+    G -->|YES| A
+    G -->|NO| H["🙋 Ask User"]
 ```
 
 ---
 
-## 6. MODELOS DE DADOS PRINCIPAIS
-
-### 6.1 Core Domain Models
+## 6. CORE DATA MODELS
 
 ```python
 @dataclass
 class RepoContext:
-    """Contexto completo do repositório"""
+    """Complete repository context"""
     url: str
     local_path: Path
     base_branch: str
@@ -831,7 +763,7 @@ class RepoContext:
 
 @dataclass
 class ProjectPatterns:
-    """Padrões detectados no projeto"""
+    """Detected patterns in the project"""
     naming_convention: str  # snake_case | camelCase | PascalCase
     test_file_pattern: str  # test_*.py | *.test.ts
     folder_structure_type: str  # flat | nested | feature-based
@@ -840,7 +772,7 @@ class ProjectPatterns:
 
 @dataclass
 class Checkpoint:
-    """Estado salvo para recuperação"""
+    """Saved state for recovery"""
     phase: str
     timestamp: datetime
     data: Dict[str, Any]
@@ -848,7 +780,7 @@ class Checkpoint:
 
 @dataclass
 class ExecutionError:
-    """Erro capturado durante execução"""
+    """Error captured during execution"""
     type: str  # lint | typecheck | test | build
     message: str
     file: Optional[str]
@@ -859,319 +791,310 @@ class ExecutionError:
 
 ---
 
-## 7. PLANO DE IMPLEMENTAÇÃO
+## 7. IMPLEMENTATION PLAN
 
-### MVP (Minimum Viable Product) - 4-6 semanas
+### MVP (Minimum Viable Product) — 4–6 weeks
 
-**Objetivo:** Sistema funcional para demandas simples, sem GUI, validação básica.
+**Goal:** Functional system for simple demands, no GUI, basic validation.
 
-#### Sprint 1-2: Fundação
-- [ ] Setup do projeto: estrutura de pastas, poetry/pip, pre-commit hooks
-- [ ] Config manager: carregar .env, validar variáveis obrigatórias
-- [ ] CLI básico: entrada de texto, exibir progresso (Rich library)
-- [ ] Repo Manager: clone, create branch, commit, push (sem PR ainda)
-- [ ] Executor Service: rodar comandos, capturar output
+#### Sprint 1–2: Foundation
+- [ ] Project setup: folder structure, poetry/pip, pre-commit hooks
+- [ ] Config manager: load .env, validate required variables
+- [ ] Basic CLI: text input, display progress (Rich library)
+- [ ] Repo Manager: clone, create branch, commit, push (no PR yet)
+- [ ] Executor Service: run commands, capture output
 
-#### Sprint 3-4: Agentes Core
-- [ ] Planner Agent: receber demanda → gerar plano simples (sem DAG complexo)
-- [ ] Coder Agent: implementar subtask → FileChanges
-- [ ] Model Router: OpenAI + fallback para Ollama
-- [ ] Loop básico: plan → implement → test (1 iteração, sem correção automática)
+#### Sprint 3–4: Core Agents
+- [ ] Planner Agent: receive demand → generate simple plan (no complex DAG)
+- [ ] Coder Agent: implement subtask → FileChanges
+- [ ] Model Router: OpenAI + fallback to Ollama
+- [ ] Basic loop: plan → implement → test (1 iteration, no auto-correction)
 
-#### Sprint 5-6: Integração e Testes
-- [ ] Integrar GitHub Provider: ler Issue, criar PR
-- [ ] Test Agent: gerar testes básicos (pytest)
-- [ ] Validação: rodar pytest e capturar resultado
-- [ ] End-to-end: demanda simples → PR funcional
-- [ ] Testes unitários do próprio sistema (coverage > 60%)
+#### Sprint 5–6: Integration & Testing
+- [ ] GitHub Provider integration: read Issue, create PR
+- [ ] Test Agent: generate basic tests (pytest)
+- [ ] Validation: run pytest and capture result
+- [ ] End-to-end: simple demand → functional PR
+- [ ] System unit tests (coverage > 60%)
 
-**Entregável MVP:**
-- CLI que aceita texto ou Issue
-- Gera plano, pede confirmação
-- Implementa mudanças simples
-- Cria testes básicos
-- Abre PR no GitHub
+**MVP Deliverable:**
+- CLI that accepts text or Issue
+- Generates plan, asks for confirmation
+- Implements simple changes
+- Creates basic tests
+- Opens PR on GitHub
 
 ---
 
-### V1 (Production-Ready) - 8-12 semanas
+### V1 (Production-Ready) — 8–12 weeks
 
-**Objetivo:** Sistema robusto com correção automática, vector store, memória.
+**Goal:** Robust system with auto-correction, vector store, memory.
 
-#### Sprint 7-8: Vector Store e RAG
+#### Sprint 7–8: Vector Store & RAG
 - [ ] Indexer Service: scan repo, chunking, embeddings
-- [ ] FAISS integration: criar/salvar/carregar índice
-- [ ] Semantic search: buscar contexto antes de gerar código
-- [ ] Incremental indexing: reindexar apenas arquivos alterados
+- [ ] FAISS integration: create/save/load index
+- [ ] Semantic search: retrieve context before generating code
+- [ ] Incremental indexing: reindex only modified files
 
-#### Sprint 9-10: Correção Automática
-- [ ] Feedback Loop: implementar ciclo de correção (max 3 tentativas)
-- [ ] Error Diagnoser: parsers para pytest, eslint, mypy, etc.
+#### Sprint 9–10: Auto-Correction
+- [ ] Feedback Loop: implement correction cycle (max 3 attempts)
+- [ ] Error Diagnoser: parsers for pytest, eslint, mypy, etc.
 - [ ] Memory Service: SQLite schema, store/query executions
-- [ ] Pattern Learner: detectar padrões do repo automaticamente
+- [ ] Pattern Learner: automatically detect repo patterns
 
-#### Sprint 11-12: Robustez e Qualidade
-- [ ] Checkpoint system: salvar estado, permitir resume
-- [ ] Confirmações: ações destrutivas, mudanças grandes
-- [ ] Redação de segredos: detectar e mascarar
-- [ ] Reviewer Agent: análise de qualidade pré-PR
-- [ ] Logs estruturados: JSON output opcional
-- [ ] Cobertura de testes > 80%
+#### Sprint 11–12: Robustness & Quality
+- [ ] Checkpoint system: save state, allow resume
+- [ ] Confirmations: destructive actions, large changes
+- [ ] Secret redaction: detect and mask
+- [ ] Reviewer Agent: quality analysis before PR
+- [ ] Structured logs: optional JSON output
+- [ ] Test coverage > 80%
 
-**Entregável V1:**
-- Correção automática de erros (até 3 tentativas)
-- RAG com vector store para contexto rico
-- Memória persistente entre execuções
-- Segurança e confirmações
-- Pronto para uso em produção (projetos reais)
+**V1 Deliverable:**
+- Auto-correction of errors (up to 3 attempts)
+- RAG with vector store for rich context
+- Persistent memory between executions
+- Security and confirmations
+- Ready for production use (real projects)
 
 ---
 
-### V2 (Advanced Features) - 12-16 semanas
+### V2 (Advanced Features) — 12–16 weeks
 
-**Objetivo:** GUI, multi-linguagem, integrações avançadas.
+**Goal:** GUI, multi-language, advanced integrations.
 
-#### Sprint 13-14: Interface Gráfica
+#### Sprint 13–14: Graphical Interface
 - [ ] Electron/Tauri setup
-- [ ] Frontend Angular: componentes principais
-  - Dashboard: status, progresso
-  - Plan Viewer: árvore de subtasks
+- [ ] Angular frontend: main components
+  - Dashboard: status, progress
+  - Plan Viewer: subtask tree
   - Diff Viewer: syntax-highlighted diffs
-  - Test Results: tabela de testes
-- [ ] WebSocket: comunicação real-time CLI ↔ GUI
-- [ ] State sync: mesma execução visível em CLI e GUI
+  - Test Results: test table
+- [ ] WebSocket: real-time CLI ↔ GUI communication
+- [ ] State sync: same execution visible in CLI and GUI
 
-#### Sprint 15-16: Expansão
-- [ ] Suporte a mais linguagens: Go, Rust, Java
-- [ ] GitLab e Bitbucket providers
-- [ ] ChromaDB / LanceDB como alternativas ao FAISS
-- [ ] Integração com IDEs: VSCode extension (opcional)
-- [ ] CI/CD integration: rodar como GitHub Action
-- [ ] Telemetria: métricas de uso (opcional, opt-in)
+#### Sprint 15–16: Expansion
+- [ ] More language support: Go, Rust, Java
+- [ ] GitLab and Bitbucket providers
+- [ ] ChromaDB / LanceDB as FAISS alternatives
+- [ ] IDE integrations: VSCode extension (optional)
+- [ ] CI/CD integration: run as GitHub Action
+- [ ] Telemetry: usage metrics (optional, opt-in)
 
-**Entregável V2:**
-- GUI completa e amigável
-- Suporte a múltiplas linguagens e Git providers
-- Extensibilidade via plugins
-- Integração com ferramentas de desenvolvimento
-
----
-
-## 8. DECISÕES PENDENTES (PERGUNTAS)
-
-### Questões Críticas (Bloqueantes)
-
-#### 1. Modelo de Negócio e Licenciamento
-**Pergunta:** O software será open-source (MIT/Apache) ou proprietário? Haverá versão paga/enterprise?  
-**Impacto:** Decisão sobre dependências, telemetria, cloud services.  
-**Recomendação:** Open-source (Apache 2.0) com modelo "open-core" (features enterprise pagas opcionais: cloud sync, analytics, team features).
-
-#### 2. Provedor de Embeddings Padrão
-**Pergunta:** Qual provedor de embeddings usar por padrão? OpenAI (pago, alta qualidade) ou local (gratuito, menor qualidade)?  
-**Opções:**
-- OpenAI `text-embedding-3-small` (custo: ~$0.02/1M tokens, rápido, preciso)
-- HuggingFace local (`sentence-transformers/all-MiniLM-L6-v2`, gratuito, ~400MB RAM)
-- Ollama local (`nomic-embed-text`, gratuito, requer Ollama)  
-**Recomendação:** OpenAI por padrão (melhor experiência), com fallback para HuggingFace local se API key não estiver configurada.
-
-#### 3. Limite de Tamanho de Repositório
-**Pergunta:** Qual o limite para indexação? Repositórios com 100k+ arquivos devem ser suportados?  
-**Impacto:** Performance, memória, custo de embeddings.  
-**Recomendação:** 
-- Padrão: até 10k arquivos (configurável via `MAX_FILES_INDEX`)
-- Para repos maiores: permitir indexação seletiva (ex.: apenas `src/`, `lib/`)
-- Warning se ultrapassar limite
-
-#### 4. Estratégia de Versionamento de Memória
-**Pergunta:** Memória é global por repo ou por branch? Aprendizado de um branch contamina outro?  
-**Opções:**
-- Global por repo: mais simples, mas pode misturar contextos
-- Por branch: isolado, mas duplica dados
-- Híbrido: memória base + override por branch  
-**Recomendação:** Híbrido - memória base do repo + contexto específico por branch.
+**V2 Deliverable:**
+- Complete and user-friendly GUI
+- Support for multiple languages and Git providers
+- Extensibility via plugins
+- Integration with development tools
 
 ---
 
-### Questões Importantes (Médio Impacto)
+## 8. OPEN DECISIONS
 
-#### 5. Formato de Mensagens de Commit
-**Pergunta:** Forçar Conventional Commits ou permitir formato livre?  
-**Recomendação:** Detectar se o repo já usa Conventional Commits (via histórico) e adaptar. Se não detectar, usar formato descritivo livre.
+### Critical Questions (Blockers)
 
-#### 6. Execução de Testes de Integração
-**Pergunta:** Rodar testes de integração automaticamente ou apenas unitários?  
-**Impacto:** Tempo de execução, dependências externas (DB, APIs).  
-**Recomendação:** MVP - apenas unitários. V1 - permitir opcionalmente com flag `--run-integration`.
+#### 1. Business Model & Licensing
+**Question:** Will the software be open-source (MIT/Apache) or proprietary? Will there be a paid/enterprise version?  
+**Recommendation:** Open-source (Apache 2.0) with an "open-core" model (optional paid enterprise features: cloud sync, analytics, team features).
 
-#### 7. Tratamento de Secrets no Código
-**Pergunta:** Se o agente detectar hardcoded secrets no código existente, deve alertar? Corrigir automaticamente?  
-**Recomendação:** Alertar sempre, mas não corrigir automaticamente (risco de quebrar funcionamento). Sugerir migração para .env.
+#### 2. Default Embedding Provider
+**Question:** Which embedding provider to use by default? OpenAI (paid, high quality) or local (free, lower quality)?  
+**Options:**
+- OpenAI `text-embedding-3-small` (~$0.02/1M tokens, fast, accurate)
+- HuggingFace local (`sentence-transformers/all-MiniLM-L6-v2`, free, ~400MB RAM)
+- Ollama local (`nomic-embed-text`, free, requires Ollama)  
+**Recommendation:** OpenAI by default (best experience), with fallback to HuggingFace local if API key is not configured.
+
+#### 3. Repository Size Limit
+**Question:** What is the indexing limit? Should repos with 100k+ files be supported?  
+**Recommendation:**
+- Default: up to 10k files (configurable via `MAX_FILES_INDEX`)
+- For larger repos: allow selective indexing (e.g., only `src/`, `lib/`)
+- Warning if limit is exceeded
+
+#### 4. Memory Versioning Strategy
+**Question:** Is memory global per repo or per branch? Does learning from one branch contaminate another?  
+**Recommendation:** Hybrid — base repo memory + branch-specific context override.
+
+---
+
+### Important Questions (Medium Impact)
+
+#### 5. Commit Message Format
+**Question:** Enforce Conventional Commits or allow free format?  
+**Recommendation:** Detect if the repo already uses Conventional Commits (via history) and adapt. If not detected, use free descriptive format.
+
+#### 6. Integration Test Execution
+**Question:** Run integration tests automatically or only unit tests?  
+**Recommendation:** MVP — unit tests only. V1 — allow optionally with `--run-integration` flag.
+
+#### 7. Handling Secrets in Code
+**Question:** If the agent detects hardcoded secrets in existing code, should it alert? Auto-fix?  
+**Recommendation:** Always alert, but never auto-fix (risk of breaking functionality). Suggest migration to .env.
 
 #### 8. Multi-Repo Support
-**Pergunta:** Suportar mudanças em múltiplos repositórios numa mesma demanda? (ex.: API + Frontend)  
-**Recomendação:** Não no MVP. V2 - suportar com orquestração entre repos.
+**Question:** Support changes across multiple repositories in a single demand? (e.g., API + Frontend)  
+**Recommendation:** Not in MVP. V2 — support with cross-repo orchestration.
 
 ---
 
-### Questões de Experiência do Usuário
+### User Experience Questions
 
-#### 9. Nível de Verbosidade Padrão
-**Pergunta:** CLI deve ser verboso por padrão ou silencioso (apenas progresso)?  
-**Recomendação:** Moderado - mostrar fases principais + progress bars. Modo `--verbose` para debug.
+#### 9. Default Verbosity Level
+**Question:** Should the CLI be verbose by default or silent (progress only)?  
+**Recommendation:** Moderate — show main phases + progress bars. `--verbose` mode for debugging.
 
-#### 10. Cancelamento de Execução
-**Pergunta:** Permitir Ctrl+C a qualquer momento? Como tratar estado parcial?  
-**Recomendação:** 
-- Ctrl+C → salvar checkpoint automaticamente
-- Próxima execução → perguntar "Retomar execução anterior?"
-- Opção `--clean` para ignorar checkpoints
+#### 10. Execution Cancellation
+**Question:** Allow Ctrl+C at any time? How to handle partial state?  
+**Recommendation:**
+- Ctrl+C → automatically save checkpoint
+- Next execution → ask "Resume previous execution?"
+- `--clean` option to ignore checkpoints
 
-#### 11. Atualização Automática do Agente
-**Pergunta:** O CLI deve verificar atualizações automaticamente? Auto-update?  
-**Recomendação:** Verificar ao iniciar (não-bloqueante), exibir notificação. Não fazer auto-update (usuário decide via `pip install --upgrade enginai`).
+#### 11. Automatic Agent Updates
+**Question:** Should the CLI automatically check for updates? Auto-update?  
+**Recommendation:** Check on startup (non-blocking), display notification. No auto-update (user decides via `pip install --upgrade enginai`).
 
 ---
 
-### Questões Técnicas de Implementação
+### Technical Implementation Questions
 
 #### 12. AST vs String Manipulation
-**Pergunta:** Para modificar código, usar AST parsing (mais preciso, complexo) ou regex/LLM direto (mais simples, risco de quebrar)?  
-**Recomendação:** Híbrido:
-- Python/TypeScript: tentar AST primeiro (via `ast`/`babel`), fallback para LLM
-- Outras linguagens: LLM direto com validação sintática posterior
+**Question:** For code modification, use AST parsing (more precise, complex) or regex/LLM directly (simpler, risk of breaking)?  
+**Recommendation:** Hybrid — Python/TypeScript: try AST first (`ast`/`babel`), fallback to LLM. Other languages: LLM directly with subsequent syntax validation.
 
-#### 13. Rate Limiting de APIs LLM
-**Pergunta:** Como lidar com rate limits (ex.: OpenAI 500 req/min)?  
-**Recomendação:** 
-- Implementar retry com exponential backoff
-- Batch requests quando possível
-- Mostrar progresso transparente ("Aguardando rate limit...")
+#### 13. LLM API Rate Limiting
+**Question:** How to handle rate limits (e.g., OpenAI 500 req/min)?  
+**Recommendation:**
+- Implement retry with exponential backoff
+- Batch requests when possible
+- Show transparent progress ("Waiting for rate limit...")
 
-#### 14. Isolamento de Ambiente Python/Node
-**Pergunta:** Criar virtualenv/node_modules automaticamente ou assumir que já existe?  
-**Recomendação:** Detectar e usar existente. Se não houver, alertar usuário e orientar criação (não criar automaticamente - pode conflitar com workflow).
+#### 14. Python/Node Environment Isolation
+**Question:** Create virtualenv/node_modules automatically or assume it already exists?  
+**Recommendation:** Detect and use existing. If none, alert user and guide creation (do not create automatically — may conflict with workflow).
 
 ---
 
-## 9. REQUISITOS FUNCIONAIS DETALHADOS
+## 9. DETAILED FUNCTIONAL REQUIREMENTS
 
-### 9.1 Entrada de Demanda e Entendimento
-- Aceitar solicitações em texto (ex.: "crie uma API REST para cadastro de usuários")
-- Ler Issues de provedor Git (prioridade: GitHub)
-- Se houver ambiguidade, fazer perguntas objetivas antes de começar
-- Suportar anexos contextuais: trechos de logs, stack traces, links, e arquivos locais
+### 9.1 Demand Input & Understanding
+- Accept requests as free text (e.g., "create a REST API for user registration")
+- Read Issues from Git provider (priority: GitHub)
+- If ambiguous, ask objective questions before starting
+- Support contextual attachments: log snippets, stack traces, links, and local files
 
-### 9.2 Planejamento de Tarefas (Planner)
-- Transformar demanda em plano com subtarefas claras, critérios de aceite e dependências
-- Para cada subtarefa: arquivos prováveis, estratégia de testes, riscos, validações
-- Plano revisável: sempre apresentar e pedir "confirmar / ajustar"
+### 9.2 Task Planning (Planner)
+- Transform demand into a plan with clear subtasks, acceptance criteria, and dependencies
+- Per subtask: probable files, test strategy, risks, validations
+- Reviewable plan: always present and ask "confirm / adjust"
 
-### 9.3 Operações de Repositório (Repo Manager)
-- Clonar repositório (HTTPS/SSH), checar branch base, criar branch de trabalho
-- Criar/editar/apagar arquivos de código, configs e testes
-- Commit com mensagens consistentes (Conventional Commits opcional)
-- Push para remoto e abertura de Pull Request
-- Vincular PR à Issue e incluir descrição com resumo, testes e impactos
+### 9.3 Repository Operations (Repo Manager)
+- Clone repository (HTTPS/SSH), check base branch, create working branch
+- Create/edit/delete code files, configs, and tests
+- Commit with consistent messages (Conventional Commits optional)
+- Push to remote and open Pull Request
+- Link PR to Issue and include description with summary, tests, and impacts
 
-### 9.4 Processamento e Busca Semântica (Indexer + Vector Store)
-- Processar projeto completo: árvore de arquivos, detectar linguagens/frameworks/padrões
-- Criar embeddings e índice vetorial local (FAISS padrão)
-- Chunking com tamanho/sobreposição configuráveis, ignorar vendor/artefatos
-- Persistir índice e permitir reindex incremental
+### 9.4 Processing & Semantic Search (Indexer + Vector Store)
+- Process full project: file tree, detect languages/frameworks/patterns
+- Create embeddings and local vector index (FAISS default)
+- Chunking with configurable size/overlap, ignore vendor/artifacts
+- Persist index and allow incremental reindex
 
-### 9.5 Execução de Código (Executor)
-- Gerar mudanças em ciclos: implementar → testar → validar → corrigir
-- Usar ferramentas do projeto: test runner, linter, formatter, typecheck
-- Capturar saída, interpretar erros, sugerir e aplicar correções
-- Modo seguro (read-only) e modo aplicar mudanças
+### 9.5 Code Execution (Executor)
+- Generate changes in cycles: implement → test → validate → fix
+- Use project tools: test runner, linter, formatter, typecheck
+- Capture output, interpret errors, suggest and apply fixes
+- Safe mode (read-only) and apply-changes mode
 
-### 9.6 Testes Unitários Obrigatórios
-- Criar/atualizar testes adequados para toda atividade
-- Garantir padrão red/green quando possível
-- Relatar cobertura e lacunas
+### 9.6 Mandatory Unit Tests
+- Create/update appropriate tests for every activity
+- Ensure red/green pattern when possible
+- Report coverage and gaps
 
-### 9.7 Validação e Correção Automática
-- Pipeline local: lint → typecheck → unit tests
-- Ao falhar: diagnóstico com causa, arquivo/linha, hipótese e plano
-- Repetir loop até aceite ou solicitar intervenção
+### 9.7 Validation & Auto-Correction
+- Local pipeline: lint → typecheck → unit tests
+- On failure: diagnosis with cause, file/line, hypothesis, and plan
+- Repeat loop until acceptance or request user intervention
 
-### 9.8 Memória e Contexto (Project Memory)
-- Histórico: decisões, erros recorrentes, comandos, padrões
-- Aprender com falhas: post-mortem e heurísticas
-- Persistência local (SQLite/JSONL) com escopo por repo/branch/issue
+### 9.8 Memory & Context (Project Memory)
+- History: decisions, recurring errors, commands, patterns
+- Learn from failures: post-mortem and heuristics
+- Local persistence (SQLite/JSONL) scoped per repo/branch/issue
 
 ### 9.9 Interface (CLI + GUI)
-- CLI: progresso, logs estruturados, modo verboso, confirmações
-- GUI: plano, diffs, resultados, botões de controle
-- Ambos: explicar ações em linguagem simples, indicar status
+- CLI: progress, structured logs, verbose mode, confirmations
+- GUI: plan, diffs, results, control buttons
+- Both: explain actions in plain language, indicate status
 
-### 9.10 Multi-Modelo (Model Router)
-- Suportar múltiplos modelos (nuvem via API, local via Ollama)
-- Roteamento por tarefa: modelo rápido/forte/barato conforme necessidade
-- Fallback: alternar provedor mantendo contexto
+### 9.10 Multi-Model (Model Router)
+- Support multiple models (cloud via API, local via Ollama)
+- Task-based routing: fast/strong/cheap model as needed
+- Fallback: switch provider while maintaining context
 
 ---
 
-## 10. REQUISITOS NÃO FUNCIONAIS
+## 10. NON-FUNCTIONAL REQUIREMENTS
 
-### 10.1 Segurança
-- Nunca expor segredos em logs, PRs ou prompts
-- Redigir automaticamente tokens/keys ao capturar logs
-- Confirmar ações destrutivas e operações Git críticas
+### 10.1 Security
+- Never expose secrets in logs, PRs, or prompts
+- Automatically redact tokens/keys when capturing logs
+- Confirm destructive actions and critical Git operations
 
-### 10.2 Confiabilidade
-- Operações idempotentes quando possível
-- Checkpoints: salvar estado entre etapas
+### 10.2 Reliability
+- Idempotent operations when possible
+- Checkpoints: save state between steps
 
 ### 10.3 Performance
-- Indexação incremental e cache de embeddings
-- Suporte a repositórios grandes (limites configuráveis)
+- Incremental indexing and embedding cache
+- Support for large repositories (configurable limits)
 
-### 10.4 Portabilidade
-- Rodar em Windows/Linux/macOS
-- Instalação simples (CLI) e GUI opcional
+### 10.4 Portability
+- Run on Windows/Linux/macOS
+- Simple installation (CLI) and optional GUI
 
-### 10.5 Observabilidade
-- Logs estruturados (JSON opcional), níveis (INFO/WARN/ERROR)
-- Relatório final por execução
+### 10.5 Observability
+- Structured logs (optional JSON), levels (INFO/WARN/ERROR)
+- Final report per execution
 
-### 10.6 Extensibilidade
-- Arquitetura modular: Provedor Git, Vector Store, Embeddings, Test Runners, Model Providers
+### 10.6 Extensibility
+- Modular architecture: Git Provider, Vector Store, Embeddings, Test Runners, Model Providers
 
 ---
 
-## 11. STACK TECNOLÓGICO RECOMENDADO
+## 11. RECOMMENDED TECH STACK
 
 ### Core
-- **Linguagem:** Python 3.11+
-- **Gerenciador de Dependências:** Poetry
-- **Validação de Dados:** Pydantic v2
+- **Language:** Python 3.11+
+- **Dependency Manager:** Poetry
+- **Data Validation:** Pydantic v2
 - **Async Runtime:** asyncio + aiohttp
 
 ### CLI
 - **Interface:** Rich (progress bars, tables, prompts)
-- **Args Parsing:** Click ou Typer
+- **Args Parsing:** Click or Typer
 
 ### Git
-- **Biblioteca:** GitPython ou pygit2
+- **Library:** GitPython or pygit2
 
 ### Vector Store
-- **Padrão:** FAISS (local)
-- **Alternativas:** ChromaDB, LanceDB
+- **Default:** FAISS (local)
+- **Alternatives:** ChromaDB, LanceDB
 
 ### LLM Providers
 - **OpenAI:** openai SDK
 - **Anthropic:** anthropic SDK
-- **Ollama:** httpx (HTTP direto)
+- **Ollama:** httpx (HTTP direct)
 
 ### Persistence
-- **Memória:** SQLite
-- **ORM:** SQLAlchemy (opcional) ou SQL direto
+- **Memory:** SQLite
+- **ORM:** SQLAlchemy (optional) or raw SQL
 
 ### GUI (V2)
-- **Runtime:** Electron ou Tauri
+- **Runtime:** Electron or Tauri
 - **Frontend:** Angular + TypeScript
-- **Comunicação:** WebSocket (Socket.IO ou nativo)
+- **Communication:** WebSocket (Socket.IO or native)
 
 ### Testing
 - **Framework:** pytest
@@ -1180,48 +1103,48 @@ class ExecutionError:
 
 ---
 
-## 12. PRÓXIMOS PASSOS
+## 12. NEXT STEPS
 
-1. **Validar decisões críticas** (questões 1-4) com stakeholders
-2. **Criar protótipo arquitetural** (spike de 1 semana):
-   - Orchestrator básico
-   - Integração OpenAI
-   - FAISS indexing simples
+1. **Validate critical decisions** (questions 1–4) with stakeholders
+2. **Create architectural prototype** (1-week spike):
+   - Basic Orchestrator
+   - OpenAI integration
+   - Simple FAISS indexing
    - Git clone + commit
-3. **Setup do projeto:**
-   - Criar repositório
-   - Estrutura de pastas
+3. **Project setup:**
+   - Create repository
+   - Folder structure
    - Poetry init
    - Pre-commit hooks (black, ruff, mypy)
-4. **Iniciar Sprint 1** do MVP
+4. **Start MVP Sprint 1**
 
 ---
 
-## 13. CRITÉRIOS DE ACEITE DO PRODUTO
+## 13. PRODUCT ACCEPTANCE CRITERIA
 
-### Para MVP
-- [ ] Dado Issue real, o agente clona repo, indexa, propõe plano
-- [ ] Usuário pode confirmar/ajustar plano
-- [ ] Agente implementa, cria testes, roda validações
-- [ ] Agente commita, faz push e abre PR
-- [ ] PR contém: descrição, resumo de mudanças, testes executados
+### For MVP
+- [ ] Given a real Issue, the agent clones the repo, indexes it, proposes a plan
+- [ ] User can confirm/adjust the plan
+- [ ] Agent implements, creates tests, runs validations
+- [ ] Agent commits, pushes, and opens a PR
+- [ ] PR contains: description, change summary, executed tests
 
-### Para V1
-- [ ] Em caso de falha de testes, agente itera e corrige (até 3x)
-- [ ] Memória persistente: execuções anteriores informam decisões
-- [ ] RAG funcional: contexto relevante recuperado antes de gerar código
-- [ ] Segurança: confirmações para ações destrutivas, secrets mascarados
-- [ ] Logs estruturados e checkpoints funcionais
+### For V1
+- [ ] On test failure, agent iterates and fixes (up to 3x)
+- [ ] Persistent memory: previous executions inform decisions
+- [ ] Functional RAG: relevant context retrieved before generating code
+- [ ] Security: confirmations for destructive actions, masked secrets
+- [ ] Functional structured logs and checkpoints
 
-### Para V2
-- [ ] GUI e CLI mantêm mesmo estado
-- [ ] Suporte a 5+ linguagens (Python, TS, JS, Go, Rust)
+### For V2
+- [ ] GUI and CLI maintain the same state
+- [ ] Support for 5+ languages (Python, TS, JS, Go, Rust)
 - [ ] 3+ Git providers (GitHub, GitLab, Bitbucket)
-- [ ] Extensível via plugins
-- [ ] Documentação completa + exemplos
+- [ ] Extensible via plugins
+- [ ] Complete documentation + examples
 
 ---
 
-**Documento gerado em:** 22 de Janeiro de 2026  
-**Status:** Draft - Aguardando validação de decisões críticas  
-**Próxima revisão:** Após Sprint 1
+**Document generated on:** January 22, 2026  
+**Status:** Draft — Awaiting validation of critical decisions  
+**Next review:** After Sprint 1
