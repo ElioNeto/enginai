@@ -1,4 +1,4 @@
-# Zero-Cost Stack for AI Dev Agent - Optimized for Your Machine
+# Zero-Cost Stack for enginai - Optimized for Your Machine
 
 **Date:** January 22, 2026  
 **Detected Hardware:** i5-9300H + 16GB RAM + GTX 1650 4GB
@@ -24,14 +24,14 @@
 ```
 ┌────────────────────────────────────────────────┐
 │           AGENT REQUEST                         │
-└───────────────────┬────────────────────────────┘
+└───────────────────┬────────────────────────┘
                     │
             ┌───────▼───────┐
             │  Model Router  │
             │ (Quota Check)  │
             └───────┬───────┘
                     │
-      ┌──────────┬───────────┐
+      ┌──────────┬──────────┐
       │  YES (< 1,500/day)  │  NO (limit reached)
       │  ├─► GEMINI 2.5    │  ├─► OLLAMA + GPU
       │  │  • Flash: General│  │  • qwen:7b
@@ -114,13 +114,13 @@ ollama pull qwen2.5:14b-instruct-q4_K_M
 
 ```bash
 # ==========================================
-# AI DEV AGENT - MVP CONFIGURATION
+# ENGINAI - MVP CONFIGURATION
 # ==========================================
 
 # === ENVIRONMENT ===
 APP_ENV=dev
 LOG_LEVEL=INFO
-WORKDIR=~/.aidevagent/workspace
+WORKDIR=~/.enginai/workspace
 
 # === GIT (GITHUB) ===
 GIT_PROVIDER=github
@@ -153,12 +153,12 @@ EMBEDDING_DEVICE=cpu  # or 'cuda' for GPU
 
 # === VECTOR STORE (LOCAL - FAISS) ===
 VECTOR_STORE=faiss
-VECTOR_DB_PATH=~/.aidevagent/vectordb
+VECTOR_DB_PATH=~/.enginai/vectordb
 MAX_FILES_INDEX=10000
 IGNORE_GLOBS=node_modules/**,dist/**,.venv/**,build/**,__pycache__/**
 
 # === MEMORY (SQLITE) ===
-MEMORY_DB_PATH=~/.aidevagent/memory.db
+MEMORY_DB_PATH=~/.enginai/memory.db
 ENABLE_LEARNING=true
 ```
 
@@ -290,7 +290,7 @@ if __name__ == "__main__":
 
 | Stack | Monthly Cost | Requests/Day | Quality |
 |-------|--------------|--------------|---------|
-| **This Stack (Gemini + Ollama)** | **$0** | **Unlimited** | ⭐⭐⭐⭐⭐ |
+| **enginai (Gemini + Ollama)** | **$0** | **Unlimited** | ⭐⭐⭐⭐⭐ |
 | OpenAI GPT-4 Turbo | ~$35-70 | 200-400 | ⭐⭐⭐⭐⭐ |
 | Anthropic Claude 3.5 | ~$30-60 | 200-400 | ⭐⭐⭐⭐⭐ |
 | Groq (free tier) | $0 | 14,400 | ⭐⭐⭐⭐ |
@@ -345,7 +345,7 @@ ollama pull deepseek-r1:7b-q4_0      # ~2.8GB VRAM
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│          AI DEV AGENT - ZERO COST STACK          │
+│          ENGINAI - ZERO COST STACK               │
 ├─────────────────────────────────────────────────────┤
 │                                                   │
 │  🧠 Primary LLM: Gemini 2.5 Flash               │
