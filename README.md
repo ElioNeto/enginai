@@ -1,4 +1,4 @@
-<![CDATA[<div align="center">
+<div align="center">
 
 # ⚙️ EnginAI
 
@@ -234,4 +234,3 @@ gantt
 ## 📄 License
 
 MIT © [Elio Neto](https://github.com/ElioNeto)
-]]>
