@@ -1,4 +1,4 @@
-# AI Dev Agent - Complete MVP Technical Specification
+# enginai - Complete MVP Technical Specification
 
 **Version:** 3.0 - Complete MVP (Create + Implement)  
 **Date:** January 22, 2026  
@@ -16,7 +16,7 @@ Developers lose time on:
 2. **Implementing repetitive features** in existing projects (endpoints, CRUD, validations)
 
 ### MVP Solution
-AI Dev Agent that **creates applications from scratch** using templates and **implements simple features** in existing repositories, with a fully automated workflow.
+enginai **creates applications from scratch** using templates and **implements simple features** in existing repositories, with a fully automated workflow.
 
 ### MVP Scope (What it DOES)
 
@@ -79,7 +79,7 @@ AI Dev Agent that **creates applications from scratch** using templates and **im
          │  (Mode Router) │
          └───────┬────────┘
                  │
-    ┌────────────┼────────────┐
+    ┌──────────┼──────────┐
     │ CREATE     │ IMPLEMENT  │
     ▼            ▼            
 ┌────────┐   ┌─────────────────────┐
@@ -89,7 +89,7 @@ AI Dev Agent that **creates applications from scratch** using templates and **im
     │                  │
     └──────────┬───────┘
                │
-    ┌──────────┼─────────────┐
+    ┌──────────┼────────────┐
     │          │             │
 ┌───▼───┐  ┌──▼─────┐  ┌───▼─────┐
 │ Repo  │  │Template │  │   LLM    │
@@ -146,21 +146,21 @@ AI Dev Agent that **creates applications from scratch** using templates and **im
 
 ```bash
 # === CREATE NEW APP ===
-aidevagent create --type api --name user-service --language python
-aidevagent create --type webapp --name dashboard --framework angular
-aidevagent create --type script --name data-processor
+enginai create --type api --name user-service --language python
+enginai create --type webapp --name dashboard --framework angular
+enginai create --type script --name data-processor
 
 # === IMPLEMENT FEATURE ===
-aidevagent implement --issue <URL>
-aidevagent implement --text "add GET /users endpoint" --repo <URL>
+enginai implement --issue <URL>
+enginai implement --text "add GET /users endpoint" --repo <URL>
 
 # === CONFIGURATION ===
-aidevagent config --check
-aidevagent config --setup
+enginai config --check
+enginai config --setup
 
 # === TEMPLATES ===
-aidevagent templates --list
-aidevagent templates --show api-fastapi
+enginai templates --list
+enginai templates --show api-fastapi
 ```
 
 ---
@@ -215,10 +215,10 @@ user-service/
 ## 4. ENVIRONMENT CONFIGURATION
 
 ```bash
-# AI DEV AGENT - CONFIGURATION
+# ENGINAI - CONFIGURATION
 APP_ENV=dev
 LOG_LEVEL=INFO
-WORKDIR=~/.aidevagent/workspace
+WORKDIR=~/.enginai/workspace
 
 GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 DEFAULT_BASE_BRANCH=main
@@ -228,7 +228,7 @@ GEMINI_DAILY_LIMIT=1450
 OLLAMA_HOST=http://localhost:11434
 OLLAMA_GPU_ENABLED=true
 
-TEMPLATES_DIR=~/.aidevagent/templates
+TEMPLATES_DIR=~/.enginai/templates
 DEFAULT_AUTHOR=Your Name
 DEFAULT_LICENSE=MIT
 ```
@@ -278,7 +278,7 @@ DEFAULT_LICENSE=MIT
 ### Case 1: Create REST API from Scratch
 
 ```bash
-aidevagent create \
+enginai create \
   --type api \
   --name user-service \
   --language python \
@@ -302,7 +302,7 @@ aidevagent create \
 ### Case 2: Implement Feature in Existing API
 
 ```bash
-aidevagent implement \
+enginai implement \
   --issue "https://github.com/user/api/issues/42"
 ```
 
