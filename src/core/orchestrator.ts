@@ -92,6 +92,7 @@ export class MainOrchestrator {
       try {
         repoPath = await this.repoManager.cloneRepo(repoUrl);
         spinner.succeed('Repository cloned');
+        console.log(chalk.gray(`  → cloned to: ${repoPath}`));
       } catch (err) {
         spinner.fail('Failed to clone repository');
         throw err;
@@ -109,7 +110,32 @@ export class MainOrchestrator {
       }
 
       console.log(chalk.cyan('\nPlan:'));
-      plan.subtasks.forEach((t, i) => console.log(`  ${i + 1}. ${t.title}`));
+      plan.subtasks.forEach((t, i) => {
+        console.log(`  ${i + 1}. ${chalk.bold(t.title)}`);
+        console.log(`     description : ${t.description}`);
+        if (t.filesToModify.length > 0) {
+          console.log(`     filesToModify: ${chalk.yellow(t.filesToModify.join(', '))}`);
+        } else {
+          console.log(chalk.red(`     filesToModify: (empty — LLM did not list any files!)`));
+        }
+        if (t.acceptanceCriteria.length > 0) {
+          console.log(`     criteria      : ${t.acceptanceCriteria.join(' | ')}`);
+        }
+      });
+
+      // Log full raw plan so we can debug LLM output
+      console.log(chalk.gray('\n  [debug] raw plan JSON:'));
+      console.log(chalk.gray(JSON.stringify(plan, null, 2)));
+
+      const totalFiles = plan.subtasks.reduce((acc, t) => acc + t.filesToModify.length, 0);
+      if (totalFiles === 0) {
+        return {
+          success: false,
+          message:
+            'Aborted: the LLM plan has no filesToModify in any subtask. ' +
+            'The plan JSON is logged above — check if the model returned a valid plan.',
+        };
+      }
 
       // 4. Implement
       spinner = ora('Implementing code...').start();
@@ -122,26 +148,48 @@ export class MainOrchestrator {
         throw err;
       }
 
+      if (changes.length === 0) {
+        return {
+          success: false,
+          message: 'Aborted: CoderAgent produced 0 file changes. No PR will be created.',
+        };
+      }
+
+      console.log(chalk.cyan('\nFiles written:'));
+      changes.forEach((c) =>
+        console.log(`  ${c.operation === 'create' ? chalk.green('+') : chalk.yellow('~')} ${c.path}`),
+      );
+
       // 5. Tests
       spinner = ora('Generating tests...').start();
       try {
         const testFiles = await this.tester.generateTests(changes, repoPath);
         spinner.succeed(chalk.green(`${testFiles.length} test files created`));
+        if (testFiles.length > 0) {
+          console.log(chalk.cyan('\nTest files:'));
+          testFiles.forEach((f) => console.log(`  + ${f}`));
+        }
       } catch (err) {
         spinner.warn('Test generation failed, continuing...');
+        console.log(chalk.gray(`  [debug] tester error: ${(err as Error).message}`));
       }
 
       // 6. Commit + Push + PR
       spinner = ora('Creating branch and PR...').start();
       try {
         const branchName = `feature/${plan.title.toLowerCase().replace(/\s+/g, '-').substring(0, 50)}`;
+        console.log(chalk.gray(`\n  → branch: ${branchName}`));
+
         await this.repoManager.createBranch(repoPath, branchName);
         await this.repoManager.commit(repoPath, `feat: ${plan.title}`);
 
-        // Push branch to remote so GitHub API can find it
+        console.log(chalk.gray(`  → pushing branch to remote...`));
         await this.repoManager.pushBranch(repoPath, repoUrl, branchName);
+        console.log(chalk.gray(`  → branch pushed`));
 
         const { owner, repo } = GitHubProvider.parseRepoUrl(repoUrl);
+        console.log(chalk.gray(`  → creating PR on ${owner}/${repo} (base: ${this.config.defaultBaseBranch})...`));
+
         const prUrl = await this.github.createPullRequest({
           owner,
           repo,
@@ -154,9 +202,11 @@ export class MainOrchestrator {
         });
 
         spinner.succeed(chalk.green('PR created'));
+        console.log(chalk.green(`  → ${prUrl}`));
         return { success: true, prUrl, message: 'Feature implemented successfully!' };
       } catch (err) {
         spinner.fail('Failed to create PR');
+        console.log(chalk.red(`  [debug] PR error: ${(err as Error).message}`));
         throw err;
       }
     } catch (err) {
