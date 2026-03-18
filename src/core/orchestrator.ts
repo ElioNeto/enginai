@@ -29,6 +29,28 @@ export class MainOrchestrator {
     this.github = new GitHubProvider(config.githubToken);
   }
 
+  /**
+   * Sanitize a string into a valid git branch name.
+   * Removes/replaces characters forbidden by git-check-ref-format.
+   */
+  private sanitizeBranchName(raw: string): string {
+    return raw
+      .toLowerCase()
+      // Replace spaces and underscores with hyphens
+      .replace(/[\s_]+/g, '-')
+      // Remove chars forbidden in git branch names
+      .replace(/[:\\,`~^?*[\]@{}<>|"'!#%&;=+]/g, '')
+      // Remove control characters and DEL
+      .replace(/[\x00-\x1f\x7f]/g, '')
+      // Collapse consecutive hyphens/dots
+      .replace(/-{2,}/g, '-')
+      .replace(/\.{2,}/g, '.')
+      // Remove leading/trailing dots, hyphens, slashes
+      .replace(/^[\.\-/]+|[\.\-/]+$/g, '')
+      // Truncate
+      .substring(0, 60);
+  }
+
   async createProject(
     projectType: string,
     name: string,
@@ -92,7 +114,7 @@ export class MainOrchestrator {
       try {
         repoPath = await this.repoManager.cloneRepo(repoUrl);
         spinner.succeed('Repository cloned');
-        console.log(chalk.gray(`  → cloned to: ${repoPath}`));
+        console.log(chalk.gray(`  \u2192 cloned to: ${repoPath}`));
       } catch (err) {
         spinner.fail('Failed to clone repository');
         throw err;
@@ -112,18 +134,17 @@ export class MainOrchestrator {
       console.log(chalk.cyan('\nPlan:'));
       plan.subtasks.forEach((t, i) => {
         console.log(`  ${i + 1}. ${chalk.bold(t.title)}`);
-        console.log(`     description : ${t.description}`);
+        console.log(`     description : ${t.description.substring(0, 120)}`);
         if (t.filesToModify.length > 0) {
           console.log(`     filesToModify: ${chalk.yellow(t.filesToModify.join(', '))}`);
         } else {
-          console.log(chalk.red(`     filesToModify: (empty — LLM did not list any files!)`));
+          console.log(chalk.red(`     filesToModify: (empty \u2014 LLM did not list any files!)`));
         }
         if (t.acceptanceCriteria.length > 0) {
           console.log(`     criteria      : ${t.acceptanceCriteria.join(' | ')}`);
         }
       });
 
-      // Log full raw plan so we can debug LLM output
       console.log(chalk.gray('\n  [debug] raw plan JSON:'));
       console.log(chalk.gray(JSON.stringify(plan, null, 2)));
 
@@ -133,7 +154,7 @@ export class MainOrchestrator {
           success: false,
           message:
             'Aborted: the LLM plan has no filesToModify in any subtask. ' +
-            'The plan JSON is logged above — check if the model returned a valid plan.',
+            'The plan JSON is logged above \u2014 check if the model returned a valid plan.',
         };
       }
 
@@ -177,18 +198,19 @@ export class MainOrchestrator {
       // 6. Commit + Push + PR
       spinner = ora('Creating branch and PR...').start();
       try {
-        const branchName = `feature/${plan.title.toLowerCase().replace(/\s+/g, '-').substring(0, 50)}`;
-        console.log(chalk.gray(`\n  → branch: ${branchName}`));
+        const rawBranch = `feature/${plan.title}`;
+        const branchName = this.sanitizeBranchName(rawBranch);
+        console.log(chalk.gray(`\n  \u2192 branch: ${branchName}`));
 
         await this.repoManager.createBranch(repoPath, branchName);
         await this.repoManager.commit(repoPath, `feat: ${plan.title}`);
 
-        console.log(chalk.gray(`  → pushing branch to remote...`));
+        console.log(chalk.gray(`  \u2192 pushing branch to remote...`));
         await this.repoManager.pushBranch(repoPath, repoUrl, branchName);
-        console.log(chalk.gray(`  → branch pushed`));
+        console.log(chalk.gray(`  \u2192 branch pushed`));
 
         const { owner, repo } = GitHubProvider.parseRepoUrl(repoUrl);
-        console.log(chalk.gray(`  → creating PR on ${owner}/${repo} (base: ${this.config.defaultBaseBranch})...`));
+        console.log(chalk.gray(`  \u2192 creating PR on ${owner}/${repo} (base: ${this.config.defaultBaseBranch})...`));
 
         const prUrl = await this.github.createPullRequest({
           owner,
@@ -202,7 +224,7 @@ export class MainOrchestrator {
         });
 
         spinner.succeed(chalk.green('PR created'));
-        console.log(chalk.green(`  → ${prUrl}`));
+        console.log(chalk.green(`  \u2192 ${prUrl}`));
         return { success: true, prUrl, message: 'Feature implemented successfully!' };
       } catch (err) {
         spinner.fail('Failed to create PR');
