@@ -38,7 +38,18 @@ export class RepoManager {
   async commit(repoPath: string, message: string): Promise<void> {
     const git: SimpleGit = simpleGit(repoPath);
     await git.add('.');
-    await git.commit(message);
+    await git.commit(message, ['--allow-empty']);
+  }
+
+  async pushBranch(repoPath: string, repoUrl: string, branchName: string): Promise<void> {
+    const git: SimpleGit = simpleGit(repoPath);
+    // Inject token into remote URL for authenticated push
+    const authedUrl = repoUrl.replace(
+      'https://',
+      `https://${this.config.githubToken}@`,
+    );
+    await git.remote(['set-url', 'origin', authedUrl]);
+    await git.push('origin', branchName, ['--set-upstream']);
   }
 
   async createPullRequest(opts: PullRequestOptions): Promise<string | null> {
