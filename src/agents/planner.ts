@@ -19,64 +19,65 @@ export class PlannerAgent {
     }
 
     const prompt = [
-      'You are a software engineer. Create an implementation plan as a JSON object.',
+      'You are a senior software engineer. Your task is to produce an implementation plan as a valid JSON object.',
+      'You MUST respond in English only. Do NOT use any other language.',
       '',
-      `DEMAND:\n${demand}`,
+      '=== DEMAND ===',
+      demand,
       '',
-      `REPO ROOT FILES: ${repoTree}`,
-      fileHints.length > 0 ? `FILES MENTIONED IN DEMAND: ${fileHints.join(', ')}` : '',
+      `=== REPOSITORY ROOT ===`,
+      repoTree,
+      fileHints.length > 0 ? `\n=== FILES MENTIONED IN DEMAND ===\n${fileHints.join(', ')}` : '',
       '',
-      'Return ONLY valid JSON (no markdown fences, no explanation):',
+      '=== OUTPUT FORMAT ===',
+      'Return ONLY a single valid JSON object. No markdown fences, no explanation, no text before or after the JSON.',
+      '',
       '{',
-      '  "title": "<short title, no colons or special chars>",',
-      '  "description": "<one sentence>",',
+      '  "title": "<short title — letters, digits, spaces and hyphens ONLY. No colons, commas, quotes or special characters>",',
+      '  "description": "<one sentence describing the goal in English>",',
       '  "subtasks": [',
       '    {',
       '      "id": "1",',
-      '      "title": "<subtask title>",',
-      '      "description": "<what to do>",',
+      '      "title": "<subtask title in English>",',
+      '      "description": "<what to implement, in English>",',
       '      "filesToModify": ["relative/path/to/file.ext"],',
-      '      "acceptanceCriteria": ["<criterion>"]',
+      '      "acceptanceCriteria": ["<verifiable criterion in English>"]',
       '    }',
       '  ]',
       '}',
       '',
-      'RULES:',
-      '- filesToModify entries must be plain relative paths, NO backticks, NO markdown.',
-      '- Do NOT truncate the JSON. Output the complete object.',
+      '=== STRICT RULES ===',
+      '1. The "title" field MUST NOT contain colons (:), commas (,), backticks (`), quotes, or any special character.',
+      '2. Every entry in "filesToModify" MUST be a plain relative path (e.g. "cmd/agnostic/root.go"). NO backticks, NO markdown, NO leading symbols.',
+      '3. Do NOT leave "filesToModify" empty in any subtask.',
+      '4. Do NOT truncate the JSON. Output the complete object.',
+      '5. All string values MUST be in English.',
       fileHints.length > 0
-        ? `- At minimum include these files: ${fileHints.join(', ')}`
-        : '- Do NOT leave filesToModify empty.',
+        ? `6. You MUST include at minimum these files: ${fileHints.join(', ')}`
+        : '6. Infer which files need to be created or modified from the demand and repo structure.',
     ].join('\n');
 
     console.log(chalk.gray('\n  [debug] sending prompt to LLM...'));
-    // Use 4096 tokens to avoid truncation of multi-subtask plans
-    const response = await this.router.complete(prompt, 'planning', 4096, 0.3);
+    const response = await this.router.complete(prompt, 'planning', 4096, 0.2);
     console.log(chalk.gray('  [debug] raw LLM response:'));
     console.log(chalk.gray(response.response));
 
     const plan = this.extractJson(response.response, demand, fileHints);
 
-    // Sanitize every filesToModify path (strip leading backticks/spaces)
+    // Sanitize filesToModify paths (strip leading backticks/spaces)
     for (const subtask of plan.subtasks) {
       subtask.filesToModify = this.sanitizeFilePaths(subtask.filesToModify);
     }
 
-    // If LLM still returned no files, fall back to the hints
+    // Fallback: if LLM returned no files, use hints from demand
     if (plan.subtasks.every((t) => t.filesToModify.length === 0) && fileHints.length > 0) {
-      console.log(
-        chalk.yellow('  [warn] LLM returned empty filesToModify \u2014 using file hints from demand text'),
-      );
+      console.log(chalk.yellow('  [warn] LLM returned empty filesToModify — using file hints from demand'));
       plan.subtasks[0].filesToModify = fileHints;
     }
 
     return plan;
   }
 
-  /**
-   * Strip leading backticks, spaces, and other non-path characters from file paths.
-   * Deduplicate the resulting list.
-   */
   private sanitizeFilePaths(files: string[]): string[] {
     const seen = new Set<string>();
     const result: string[] = [];
@@ -108,7 +109,7 @@ export class PlannerAgent {
   private extractJson(text: string, demand: string, fileHints: string[]): Plan {
     const stripped = text
       .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/,  '')
+      .replace(/\s*```\s*$/, '')
       .trim();
 
     try {
@@ -130,7 +131,7 @@ export class PlannerAgent {
       subtasks: [
         {
           id: '1',
-          title: 'Implement CLI Bootstrap',
+          title: 'Implement feature',
           description: demand,
           filesToModify: fileHints,
           acceptanceCriteria: [],
