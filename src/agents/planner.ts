@@ -5,29 +5,12 @@ export class PlannerAgent {
   constructor(private router: ModelRouter) {}
 
   async createPlan(demand: string, repoPath: string): Promise<Plan> {
-    const prompt = `
-You are a senior software engineer. Analyze the following demand and create a structured implementation plan.
+    const prompt = `Create an implementation plan for: ${demand}
+Repo: ${repoPath}
+Be concise. Return only JSON, no markdown:
+{"title":"...","description":"...","subtasks":[{"id":"1","title":"...","description":"...","filesToModify":["path"],"acceptanceCriteria":["criteria"]}]}`;
 
-Demand: ${demand}
-Repository path: ${repoPath}
-
-Respond with a JSON object (no markdown) in this exact format:
-{
-  "title": "short feature title",
-  "description": "what will be implemented",
-  "subtasks": [
-    {
-      "id": "1",
-      "title": "subtask title",
-      "description": "what to do",
-      "filesToModify": ["src/routes/health.ts"],
-      "acceptanceCriteria": ["endpoint returns 200"]
-    }
-  ]
-}
-`;
-
-    const response = await this.router.complete(prompt, 'planning', 2048, 0.7);
+    const response = await this.router.complete(prompt, 'planning', 1024, 0.7);
     return this.extractJson(response.response, demand);
   }
 
@@ -41,7 +24,6 @@ Respond with a JSON object (no markdown) in this exact format:
           return JSON.parse(match[0]) as Plan;
         } catch {}
       }
-      // Fallback plan
       return {
         title: 'Feature Implementation',
         description: demand,

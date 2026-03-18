@@ -14,23 +14,16 @@ export class TesterAgent {
 
       const lang = this.detectLanguage(change.path);
       const testPath = this.getTestPath(repoPath, change.path);
+      const framework = lang === 'python' ? 'pytest' : 'Jest';
 
-      const prompt = `
-You are a senior software engineer. Generate unit tests for the following ${lang} code.
-
+      const prompt = `Generate ${framework} unit tests for this ${lang} file.
 File: ${change.path}
-Code:
 \`\`\`${lang}
 ${change.content}
 \`\`\`
+Cover happy path + one edge case per function. Be concise. Return only test code in a code block.`;
 
-Requirements:
-- Use ${lang === 'typescript' ? 'Jest + TypeScript' : 'pytest'} conventions
-- Cover the happy path and at least one edge case per function
-- Respond ONLY with the complete test file content inside a code block
-`;
-
-      const response = await this.router.complete(prompt, 'testing', 2048);
+      const response = await this.router.complete(prompt, 'testing', 1024);
       const testCode = this.extractCode(response.response);
 
       fs.mkdirSync(path.dirname(testPath), { recursive: true });

@@ -54,6 +54,10 @@ export interface AppConfig {
   geminiDailyLimit: number;
   ollamaHost: string;
   ollamaModel: string;
+  ollamaModelPlanner: string;
+  ollamaModelCoder: string;
+  ollamaModelReviewer: string;
+  ollamaModelSummarizer: string;
   templatesDir: string;
   defaultAuthor: string;
   defaultLicense: string;
