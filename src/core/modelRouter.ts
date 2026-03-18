@@ -8,6 +8,16 @@ import { AppConfig, LLMResponse, TaskType } from '../types';
 
 const MAX_RETRIES = 3;
 
+// Free tier RPM reference (March 2026):
+// gemini-2.5-flash:      5  req/min  — use only for planning (1 req)
+// gemini-2.5-flash-lite: higher RPM  — use for coding/testing (many reqs)
+const GEMINI_MODEL_MAP: Record<TaskType, string> = {
+  planning: 'gemini-2.5-flash',
+  coding:   'gemini-2.5-flash-lite',
+  testing:  'gemini-2.5-flash-lite',
+  review:   'gemini-2.5-flash-lite',
+};
+
 interface QuotaStats {
   geminiRequests: number;
   lastReset: string;
@@ -51,25 +61,24 @@ export class ModelRouter {
     return false;
   }
 
-  // gemini-2.0-flash: 15 req/min, 1500 req/day on free tier
-  private getGeminiModel(_taskType: TaskType): string {
-    return 'gemini-2.0-flash';
+  private getGeminiModel(taskType: TaskType): string {
+    return GEMINI_MODEL_MAP[taskType];
   }
 
   private getOllamaModel(taskType: TaskType): string {
     const modelMap: Record<TaskType, string> = {
       planning: this.config.ollamaModelPlanner,
-      coding: this.config.ollamaModelCoder,
-      testing: this.config.ollamaModelReviewer,
-      review: this.config.ollamaModelReviewer,
+      coding:   this.config.ollamaModelCoder,
+      testing:  this.config.ollamaModelReviewer,
+      review:   this.config.ollamaModelReviewer,
     };
     return modelMap[taskType] || this.config.ollamaModel;
   }
 
-  /** Parse the retryDelay seconds from a 429 error message, default 60s */
+  /** Parse retryDelay seconds from a 429 error message, default 65s */
   private parseRetryDelay(errMsg: string): number {
     const match = errMsg.match(/retry[^\d]*(\d+)s/i);
-    return match ? parseInt(match[1], 10) + 2 : 60;
+    return match ? parseInt(match[1], 10) + 2 : 65;
   }
 
   private sleep(ms: number): Promise<void> {
@@ -84,14 +93,12 @@ export class ModelRouter {
   ): Promise<LLMResponse> {
     this.shouldReset();
 
-    // Try Gemini with retry on 429
     if (this.stats.geminiRequests < this.config.geminiDailyLimit && this.config.geminiApiKey) {
       const modelName = this.getGeminiModel(taskType);
-      let lastErr: unknown;
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-          console.log(chalk.gray(`  [llm] ${modelName} (attempt ${attempt}/${MAX_RETRIES})...`));
+          console.log(chalk.gray(`  [llm] ${modelName} (attempt ${attempt}/${MAX_RETRIES}, task: ${taskType})...`));
           const model = this.gemini.getGenerativeModel({
             model: modelName,
             generationConfig: { maxOutputTokens: maxTokens, temperature },
@@ -100,31 +107,29 @@ export class ModelRouter {
           const text = result.response.text();
           this.stats.geminiRequests += 1;
           this.saveStats();
-          console.log(chalk.gray(`  [llm] ✓ responded (${text.length} chars)`));
+          console.log(chalk.gray(`  [llm] ✓ responded (${text.length} chars, total today: ${this.stats.geminiRequests})` ));
           return { response: text, model: modelName, provider: 'gemini' };
         } catch (err) {
-          lastErr = err;
           const msg = (err as Error).message ?? '';
           if (msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('RESOURCE_EXHAUSTED')) {
             const delaySec = this.parseRetryDelay(msg);
             console.warn(
-              chalk.yellow(`  [llm] 429 rate-limit hit — waiting ${delaySec}s before retry ${attempt}/${MAX_RETRIES}...`),
+              chalk.yellow(`  [llm] 429 rate-limit — waiting ${delaySec}s then retry ${attempt}/${MAX_RETRIES}...`),
             );
             await this.sleep(delaySec * 1000);
           } else {
-            // Non-retryable Gemini error, break immediately
-            console.warn(chalk.yellow(`  [llm] Gemini error (non-retryable): ${msg}`));
+            console.warn(chalk.yellow(`  [llm] Gemini non-retryable error: ${msg}`));
             break;
           }
         }
       }
 
-      console.warn(chalk.yellow(`  [llm] Gemini failed after ${MAX_RETRIES} attempts, falling back to Ollama...`));
+      console.warn(chalk.yellow(`  [llm] Gemini gave up after ${MAX_RETRIES} retries, falling back to Ollama...`));
     }
 
     // Fallback: Ollama
     const ollamaModel = this.getOllamaModel(taskType);
-    console.log(chalk.gray(`  [llm] trying Ollama model: ${ollamaModel}...`));
+    console.log(chalk.gray(`  [llm] Ollama: ${ollamaModel}...`));
     try {
       const response = await axios.post(`${this.config.ollamaHost}/api/chat`, {
         model: ollamaModel,
