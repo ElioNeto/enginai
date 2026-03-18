@@ -1,0 +1,9 @@
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+{% if database %}
+sqlalchemy>=2.0.0
+{% endif %}
+{% if includeAuth %}
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.0
+{% endif %}

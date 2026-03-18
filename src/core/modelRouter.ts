@@ -58,6 +58,16 @@ export class ModelRouter {
     return modelMap[taskType];
   }
 
+  private getOllamaModel(taskType: TaskType): string {
+    const modelMap: Record<TaskType, string> = {
+      planning: this.config.ollamaModelPlanner,
+      coding: this.config.ollamaModelCoder,
+      testing: this.config.ollamaModelReviewer,
+      review: this.config.ollamaModelReviewer,
+    };
+    return modelMap[taskType] || this.config.ollamaModel;
+  }
+
   async complete(
     prompt: string,
     taskType: TaskType = 'coding',
@@ -80,21 +90,30 @@ export class ModelRouter {
         this.saveStats();
         return { response: text, model: modelName, provider: 'gemini' };
       } catch (err) {
-        console.warn(`⚠️  Gemini failed: ${err}, falling back to Ollama...`);
+        console.warn(`Gemini failed: ${err}, falling back to Ollama...`);
       }
     }
 
-    // Fallback: Ollama
-    const response = await axios.post(`${this.config.ollamaHost}/api/generate`, {
-      model: this.config.ollamaModel,
-      prompt,
-      stream: false,
-      options: { num_predict: maxTokens, temperature },
-    });
-    return {
-      response: response.data.response,
-      model: this.config.ollamaModel,
-      provider: 'ollama',
-    };
+    // Fallback: Ollama using /api/chat endpoint
+    const ollamaModel = this.getOllamaModel(taskType);
+    try {
+      const response = await axios.post(`${this.config.ollamaHost}/api/chat`, {
+        model: ollamaModel,
+        messages: [{ role: 'user', content: prompt }],
+        stream: false,
+        options: { num_predict: maxTokens, temperature },
+      });
+      return {
+        response: response.data.message.content,
+        model: ollamaModel,
+        provider: 'ollama',
+      };
+    } catch (err) {
+      const msg = (err as Error).message;
+      throw new Error(
+        `Ollama connection failed (${this.config.ollamaHost}): ${msg}. ` +
+        `Ensure Ollama is running: ollama serve`
+      );
+    }
   }
 }

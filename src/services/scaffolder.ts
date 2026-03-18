@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ModelRouter } from '../core/modelRouter';
 import { AppConfig } from '../types';
+import { TemplateEngine, TemplateVars } from './templateEngine';
 
 interface ScaffoldOptions {
   projectType: string;
@@ -13,20 +14,59 @@ interface ScaffoldOptions {
 }
 
 export class ScaffolderService {
+  private templateEngine: TemplateEngine;
+
   constructor(
     private router: ModelRouter,
     private config: AppConfig,
-  ) {}
+  ) {
+    this.templateEngine = new TemplateEngine();
+  }
 
   async generateStructure(opts: ScaffoldOptions): Promise<string> {
     const projectPath = path.join(process.cwd(), opts.name);
     fs.mkdirSync(projectPath, { recursive: true });
 
+    const vars: TemplateVars = {
+      projectName: opts.name,
+      author: this.config.defaultAuthor,
+      language: opts.language,
+      framework: opts.framework,
+      database: opts.database,
+      includeAuth: opts.includeAuth,
+      license: this.config.defaultLicense,
+    };
+
+    const templateKey = this.getTemplateKey(opts);
+
+    if (templateKey && this.templateEngine.hasTemplate(templateKey)) {
+      this.templateEngine.renderDirectory(templateKey, projectPath, vars);
+    } else {
+      this.fallbackScaffold(projectPath, opts);
+    }
+
     // Generate README with LLM
     const readme = await this.generateReadme(opts);
     fs.writeFileSync(path.join(projectPath, 'README.md'), readme);
 
-    // Scaffold based on type
+    return projectPath;
+  }
+
+  private getTemplateKey(opts: ScaffoldOptions): string | null {
+    if (opts.projectType === 'api' && opts.language === 'python') return 'api-fastapi';
+    if (opts.projectType === 'api' && opts.language === 'typescript') return 'api-express';
+    if (opts.projectType === 'script' && opts.language === 'typescript') return 'script-typescript';
+    if (opts.projectType === 'script') return 'script-typescript';
+    return null;
+  }
+
+  private async generateReadme(opts: ScaffoldOptions): Promise<string> {
+    const prompt = `Generate a README.md for project "${opts.name}" (${opts.projectType}, ${opts.language}${opts.framework ? ', ' + opts.framework : ''}). Include: title, description, install, usage, env vars, license. Be concise. Return only markdown.`;
+    const res = await this.router.complete(prompt, 'coding', 512);
+    return res.response;
+  }
+
+  private fallbackScaffold(projectPath: string, opts: ScaffoldOptions): void {
     if (opts.projectType === 'api' && opts.language === 'python') {
       this.createPythonApi(projectPath, opts);
     } else if (opts.projectType === 'api' && opts.language === 'typescript') {
@@ -36,24 +76,6 @@ export class ScaffolderService {
     } else if (opts.projectType === 'script') {
       this.createScript(projectPath, opts);
     }
-
-    return projectPath;
-  }
-
-  private async generateReadme(opts: ScaffoldOptions): Promise<string> {
-    const prompt = `
-Generate a professional README.md for a new ${opts.projectType} project.
-Project name: ${opts.name}
-Language: ${opts.language}
-Framework: ${opts.framework ?? 'none'}
-Database: ${opts.database ?? 'none'}
-Auth: ${opts.includeAuth ? 'yes' : 'no'}
-
-Include: title, description, installation, usage, environment variables, license.
-Respond with only the markdown content.
-`;
-    const res = await this.router.complete(prompt, 'coding', 1024);
-    return res.response;
   }
 
   private createPythonApi(projectPath: string, opts: ScaffoldOptions): void {

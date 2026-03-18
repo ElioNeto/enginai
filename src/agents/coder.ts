@@ -16,25 +16,13 @@ export class CoderAgent {
           ? fs.readFileSync(fullPath, 'utf-8')
           : '';
 
-        const prompt = `
-You are a senior software engineer. Implement the following subtask.
-
-Subtask: ${subtask.title}
-Description: ${subtask.description}
+        const prompt = `Task: ${subtask.title} — ${subtask.description}
 File: ${filePath}
+${existingContent ? `Current:\n\`\`\`\n${existingContent}\n\`\`\`` : 'New file.'}
+${subtask.acceptanceCriteria.length ? `Criteria: ${subtask.acceptanceCriteria.join('; ')}` : ''}
+Be concise. Return only the complete file content in a code block.`;
 
-Existing content:
-\`\`\`
-${existingContent}
-\`\`\`
-
-Acceptance criteria:
-${subtask.acceptanceCriteria.map((c) => `- ${c}`).join('\n')}
-
-Respond ONLY with the complete updated file content inside a code block.
-`;
-
-        const response = await this.router.complete(prompt, 'coding', 3000);
+        const response = await this.router.complete(prompt, 'coding', 2048);
         const code = this.extractCode(response.response);
 
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
