@@ -131,12 +131,15 @@ export class MainOrchestrator {
         spinner.warn('Test generation failed, continuing...');
       }
 
-      // 6. Commit + PR
+      // 6. Commit + Push + PR
       spinner = ora('Creating branch and PR...').start();
       try {
         const branchName = `feature/${plan.title.toLowerCase().replace(/\s+/g, '-').substring(0, 50)}`;
         await this.repoManager.createBranch(repoPath, branchName);
         await this.repoManager.commit(repoPath, `feat: ${plan.title}`);
+
+        // Push branch to remote so GitHub API can find it
+        await this.repoManager.pushBranch(repoPath, repoUrl, branchName);
 
         const { owner, repo } = GitHubProvider.parseRepoUrl(repoUrl);
         const prUrl = await this.github.createPullRequest({
