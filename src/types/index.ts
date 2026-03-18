@@ -58,6 +58,14 @@ export interface AppConfig {
   ollamaModelCoder: string;
   ollamaModelReviewer: string;
   ollamaModelSummarizer: string;
+  /** Max tokens the model can generate per request (OLLAMA_NUM_PREDICT) */
+  ollamaNumPredict: number;
+  /** Context window size in tokens (OLLAMA_NUM_CTX) */
+  ollamaNumCtx: number;
+  /** Sampling temperature — lower = more deterministic (OLLAMA_TEMPERATURE) */
+  ollamaTemperature: number;
+  /** Top-p nucleus sampling (OLLAMA_TOP_P) */
+  ollamaTopP: number;
   templatesDir: string;
   defaultAuthor: string;
   defaultLicense: string;

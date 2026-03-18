@@ -84,23 +84,36 @@ export class ModelRouter {
   async complete(
     prompt: string,
     taskType: TaskType = 'coding',
-    maxTokens: number = 2048,
-    temperature: number = 0.7,
+    maxTokens?: number,
+    temperature?: number,
   ): Promise<LLMResponse> {
     this.shouldReset();
 
+    // Resolve effective values: call-site args take priority over env config
+    const effectiveTokens     = maxTokens     ?? this.config.ollamaNumPredict;
+    const effectiveTemp       = temperature   ?? this.config.ollamaTemperature;
+    const effectiveTopP       = this.config.ollamaTopP;
+    const effectiveNumCtx     = this.config.ollamaNumCtx;
+
     // 1. Try Ollama first
     const ollamaModel = this.getOllamaModel(taskType);
-    console.log(chalk.gray(`  [llm] Ollama: ${ollamaModel} (task: ${taskType})...`));
+    console.log(chalk.gray(
+      `  [llm] Ollama: ${ollamaModel} (task: ${taskType}, ctx: ${effectiveNumCtx}, predict: ${effectiveTokens}, temp: ${effectiveTemp})...`
+    ));
     try {
       const response = await axios.post(`${this.config.ollamaHost}/api/chat`, {
         model: ollamaModel,
         messages: [{ role: 'user', content: prompt }],
         stream: false,
-        options: { num_predict: maxTokens, temperature },
+        options: {
+          num_predict: effectiveTokens,
+          num_ctx:     effectiveNumCtx,
+          temperature: effectiveTemp,
+          top_p:       effectiveTopP,
+        },
       });
       const text = response.data.message.content as string;
-      console.log(chalk.gray(`  [llm] \u2713 Ollama responded (${text.length} chars)`));
+      console.log(chalk.gray(`  [llm] ✓ Ollama responded (${text.length} chars)`));
       return { response: text, model: ollamaModel, provider: 'ollama' };
     } catch (err) {
       const msg = (err as Error).message ?? '';
@@ -119,19 +132,19 @@ export class ModelRouter {
         console.log(chalk.gray(`  [llm] Gemini: ${geminiModel} (attempt ${attempt}/${MAX_RETRIES})...`));
         const model = this.gemini.getGenerativeModel({
           model: geminiModel,
-          generationConfig: { maxOutputTokens: maxTokens, temperature },
+          generationConfig: { maxOutputTokens: effectiveTokens, temperature: effectiveTemp },
         });
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         this.stats.geminiRequests += 1;
         this.saveStats();
-        console.log(chalk.gray(`  [llm] \u2713 Gemini responded (${text.length} chars, total today: ${this.stats.geminiRequests})`));
+        console.log(chalk.gray(`  [llm] ✓ Gemini responded (${text.length} chars, total today: ${this.stats.geminiRequests})`));
         return { response: text, model: geminiModel, provider: 'gemini' };
       } catch (err) {
         const msg = (err as Error).message ?? '';
         if (msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('RESOURCE_EXHAUSTED')) {
           const delaySec = this.parseRetryDelay(msg);
-          console.warn(chalk.yellow(`  [llm] Gemini 429 \u2014 waiting ${delaySec}s then retry ${attempt}/${MAX_RETRIES}...`));
+          console.warn(chalk.yellow(`  [llm] Gemini 429 — waiting ${delaySec}s then retry ${attempt}/${MAX_RETRIES}...`));
           await this.sleep(delaySec * 1000);
         } else {
           console.warn(chalk.yellow(`  [llm] Gemini non-retryable error: ${msg}`));
