@@ -50,10 +50,10 @@ export class ModelRouter {
 
   private getGeminiModel(taskType: TaskType): string {
     const modelMap: Record<TaskType, string> = {
-      planning: 'gemini-1.5-pro',
-      coding: 'gemini-1.5-pro',
-      testing: 'gemini-1.5-flash',
-      review: 'gemini-1.5-flash',
+      planning: 'gemini-2.0-flash',
+      coding: 'gemini-2.0-flash',
+      testing: 'gemini-2.0-flash',
+      review: 'gemini-2.0-flash',
     };
     return modelMap[taskType];
   }
