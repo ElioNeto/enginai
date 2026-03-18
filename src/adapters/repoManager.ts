@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import simpleGit, { SimpleGit } from 'simple-git';
 import axios from 'axios';
+import chalk from 'chalk';
 import { AppConfig } from '../types';
 
 interface PullRequestOptions {
@@ -16,7 +17,15 @@ export class RepoManager {
 
   async cloneRepo(repoUrl: string, branch?: string): Promise<string> {
     const targetPath = path.join(this.config.workdir, 'repo');
+
+    // Remove stale workspace so git clone never fails on re-runs
+    if (fs.existsSync(targetPath)) {
+      console.log(chalk.gray(`  → cleaning existing workspace: ${targetPath}`));
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    }
+
     fs.mkdirSync(targetPath, { recursive: true });
+
     const git = simpleGit();
     const cloneOptions = branch ? ['--branch', branch] : [];
     await git.clone(repoUrl, targetPath, cloneOptions);
@@ -55,16 +64,16 @@ export class RepoManager {
   async createPullRequest(opts: PullRequestOptions): Promise<string | null> {
     const parts = opts.repoUrl.replace(/\.git$/, '').split('/');
     const owner = parts[parts.length - 2];
-    const repo = parts[parts.length - 1];
+    const repo  = parts[parts.length - 1];
 
     try {
       const response = await axios.post(
         `https://api.github.com/repos/${owner}/${repo}/pulls`,
         {
           title: opts.title,
-          body: opts.body,
-          head: opts.branch,
-          base: this.config.defaultBaseBranch,
+          body:  opts.body,
+          head:  opts.branch,
+          base:  this.config.defaultBaseBranch,
           draft: this.config.createDraftPr,
         },
         {
